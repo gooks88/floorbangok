@@ -1,0 +1,2423 @@
+<!doctype html>
+<html lang="ko" style="--toolsH: 82px;"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>반곡고등학교 층별 배치도</title>
+<!--
+  층별 아이소(등각) 배치도. 방 모양·문·기둥은 아래 plan-data(마을 지도 school-plan.js에서 만든 실측 m)에서 그리고,
+  방 이름·분류는 labels에서 읽는다. 해마다 교실이 바뀌면 화면 위 [라벨 편집]으로 고친 뒤 [HTML 저장]으로 새 파일을 받는다.
+  만든 곳: school_village 저장소 tools/isoplan (node tools/isoplan/build.mjs)
+-->
+<style id="pagesize">@page { size: A3 landscape; margin: 0 }</style>
+<style>
+:root { --ink: #23262a; --muted: #6f747b; --rule: #2a2d31; }
+* { box-sizing: border-box }
+html, body { margin: 0; background: #e6e3dd; color: var(--ink);
+  font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+/* 화면 도구 줄(인쇄에는 안 나옴) */
+.tools { position: fixed; top: 0; left: 0; right: 0; z-index: 9; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 8px 14px; background: #2b2f34; color: #eee; font-size: 13px; }
+.tools b { font-size: 14px; margin-right: 6px; color: #fff }
+.tools button, .tools select { font: inherit; padding: 5px 11px; border-radius: 6px; border: 1px solid #4b5158;
+  background: #3b4047; color: #fff; cursor: pointer; }
+.tools button:hover { background: #4a5058 }
+.tools button.on { background: #f0b443; border-color: #f0b443; color: #222 }
+.tools .sp { flex: 1 }
+.tools .seg { display: inline-flex; margin-right: 6px } .tools .seg button { border-radius: 0; margin-left: -1px }
+.tools .seg button:first-child { border-radius: 6px 0 0 6px } .tools .seg button:last-child { border-radius: 0 6px 6px 0 }
+.tools .setpick { margin-left: 8px } .tools .setpick select { max-width: 180px }
+.tools .find { display: inline-flex; margin-left: 8px } .tools .find input { font: inherit; width: 190px; padding: 5px 9px; border-radius: 6px 0 0 6px; border: 1px solid #4b5158; background: #fff; color: #222 }
+.tools .find input:only-child, .tools .find input:has(+ [hidden]) { border-radius: 6px }
+.tools .find button { border-radius: 0 6px 6px 0; margin-left: -1px }
+svg .hl { animation: hl 1.4s ease-in-out infinite }
+body.picking .fl-svg svg { cursor: crosshair } body.picking .fl { outline: 2px dashed #e03a2a; outline-offset: -2px }
+@keyframes hl { 50% { opacity: .45 } }
+.tools .dbnote { color: #b9c2cb; font-size: 12px; margin-right: 8px }
+.tools .dirty { color: #f0b443; display: none }
+body.changed .tools .dirty { display: inline }
+
+.wrap { display: flex; gap: 14px; padding: 14px 64px 14px 14px; align-items: flex-start }
+.wrap > .sheet { margin: 0 auto }   /* 확대해 넘쳐도 왼쪽이 잘리지 않게(가운데 맞춤은 margin으로) */
+/* 확대·축소 슬라이더(화면 오른쪽, 인쇄에는 안 나옴) */
+.zoom { position: fixed; right: 12px; top: 50%; transform: translateY(-50%); z-index: 8; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 6px; background: #2b2f34; border-radius: 22px; box-shadow: 0 4px 14px rgba(0,0,0,.25) }
+.zoom button { width: 30px; height: 30px; border-radius: 50%; border: 0; background: #41464d; color: #fff; font-size: 17px; cursor: pointer; line-height: 1 }
+.zoom button:hover { background: #555b63 }
+.zoom input { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 220px; accent-color: #f0b443; cursor: pointer }
+.zoom .zval { width: auto; height: auto; padding: 3px 4px; border-radius: 6px; font-size: 11px; background: none; color: #ddd }
+
+/* 종이 한 장 */
+.sheet { flex: none; width: 420mm; height: 297mm; background: #fff; box-shadow: 0 3px 14px rgba(0,0,0,.2);
+  padding: 9mm 10mm 7mm; display: grid; grid-template-rows: auto 1fr auto; gap: 3mm; overflow: hidden; }
+.sheet.a4 { width: 297mm; height: 210mm; padding: 6.4mm 7mm 5mm; gap: 2.1mm }
+/* 두 층씩(세로 종이): 위층이 위에 */
+.sheet.tall { width: 297mm; height: 420mm } .sheet.tall.a4 { width: 210mm; height: 297mm }
+.floors.two { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr auto }
+.floors.two .key { position: static; justify-self: end; order: 5 }   /* 두 층씩은 범례를 그림 아래 한 줄로(아래층 그림을 가리지 않게) */ .floors.two .fl:not(.show) { display: none }
+.floors.two .fl[data-floor="2F"], .floors.two .fl[data-floor="4F"] { order: -1 }
+
+.hd { display: flex; align-items: flex-end; gap: 8mm; border-bottom: 0.6mm solid var(--rule); padding-bottom: 2.4mm }
+.hd .ttl { flex: none }
+.hd .sp { flex: 1 }
+.hd .when { font-size: 4.6mm; font-weight: 700; color: #3b3f45; padding-bottom: .8mm }
+.sheet.a4 .hd .when { font-size: 3.4mm }
+.hd .t0 { font-size: 3.2mm; letter-spacing: .5mm; color: var(--muted); font-weight: 700 }
+.hd .t1 { font-size: 8.6mm; font-weight: 800; letter-spacing: -.2mm; line-height: 1.1 }
+.sheet.a4 .hd .t1 { font-size: 6.2mm } .sheet.a4 .hd .t0 { font-size: 2.4mm }
+/* 범례·방위: 4층 칸의 빈 아래쪽 */
+.key { position: absolute; right: 4mm; bottom: 4mm; z-index: 1; display: grid; grid-template-columns: auto 32mm; grid-template-rows: auto 1fr;
+  column-gap: 5mm; row-gap: 1.6mm; padding: 3mm 4mm; border: .3mm solid #cfcac0; border-radius: 1.2mm; background: #fff }
+.key-t { grid-column: 1; font-size: 3mm; font-weight: 800; letter-spacing: .4mm }
+.legend { grid-column: 1; display: grid; grid-template-columns: repeat(4, auto); gap: 1.5mm 4.5mm; font-size: 2.9mm }
+.legend span { display: inline-flex; align-items: center; gap: 1.4mm; white-space: nowrap }
+.legend i { width: 5mm; height: 3.4mm; border: .25mm solid rgba(0,0,0,.3); border-radius: .6mm; display: inline-block; flex: none }
+.key svg { grid-column: 2; grid-row: 1 / 3; width: 32mm; height: 21mm; align-self: center }
+.sheet.a4 .key { right: 2.8mm; bottom: 2.8mm; padding: 2mm 3mm; grid-template-columns: auto 23mm; column-gap: 3.5mm; row-gap: 1.1mm }
+.sheet.a4 .key-t { font-size: 2.2mm } .sheet.a4 .legend { font-size: 2.05mm; gap: 1.05mm 3.2mm }
+.sheet.a4 .legend i { width: 3.6mm; height: 2.4mm } .sheet.a4 .key svg { width: 23mm; height: 15mm }
+
+.floors { position: relative; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2.5mm 5mm; min-height: 0 }
+.floors.one { grid-template-columns: 1fr; grid-template-rows: 1fr } .floors.one .fl:not(.show) { display: none }
+.floors.one .fl-hd .badge { width: 15mm; height: 15mm; font-size: 7mm } .floors.one .fl-hd .sub { font-size: 3.8mm }
+.sheet.a4 .floors.one .fl-hd .badge { width: 11mm; height: 11mm; font-size: 5mm } .sheet.a4 .floors.one .fl-hd .sub { font-size: 2.8mm }
+.fl { position: relative; min-height: 0; border: .3mm solid #d9d5cc; border-radius: 1.5mm; overflow: hidden }
+.fl-hd { position: absolute; left: 3mm; top: 2.4mm; display: flex; align-items: center; gap: 2.4mm; z-index: 1; max-width: 48% }
+.fl-hd .badge { flex: none; display: grid; place-items: center; width: 11mm; height: 11mm; border-radius: 50%;
+  background: var(--rule); color: #fff; font-size: 5mm; font-weight: 800; letter-spacing: -.3mm }
+.fl-hd .sub { font-size: 3mm; line-height: 1.35; color: #3b3f45; font-weight: 600 }
+.sheet.a4 .fl-hd .badge { width: 8mm; height: 8mm; font-size: 3.6mm } .sheet.a4 .fl-hd .sub { font-size: 2.2mm }
+.fl-svg, .fl-svg svg { position: absolute; inset: 0; width: 100%; height: 100% }
+
+.ft { display: flex; align-items: center; gap: 6mm; font-size: 2.6mm; color: var(--muted); border-top: .3mm solid #cfcac0; padding-top: 1.6mm }
+.ft .sp { flex: 1 }
+.sheet.a4 .ft { font-size: 2mm }
+
+/* 도면 글자 */
+svg text { font-family: inherit; text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke-linejoin: round; }
+svg text.nm, svg text.no { stroke: #fff }
+svg .nm { font-weight: 700; fill: #1f2226 }
+svg .no { fill: #6b6f76; font-weight: 600 }
+
+/* 라벨 편집 */
+body.editing [data-meta], body.editing [data-sub] { outline: 1px dashed #e0a12e; outline-offset: 2px; cursor: text }
+body.editing .room { cursor: pointer }
+body.editing .room:hover { filter: brightness(.93) }
+.room.hit { animation: hit 1s ease 2 }
+@keyframes hit { 50% { filter: brightness(.75) } }
+.panel { flex: none; width: 380px; max-height: calc(100vh - var(--toolsH, 60px) - 20px); overflow: auto; position: sticky; top: calc(var(--toolsH, 60px) + 10px);
+  background: #fff; border-radius: 8px; box-shadow: 0 3px 14px rgba(0,0,0,.18); padding: 12px 14px; font-size: 13px }
+.panel h3 { margin: 2px 0 6px; font-size: 15px }
+.panel .hint { margin: 0 0 10px; color: #666; line-height: 1.5 }
+.panel details { margin-bottom: 8px }
+.panel summary { font-weight: 700; cursor: pointer; padding: 4px 0 }
+.panel table { width: 100%; border-collapse: collapse }
+.panel td { padding: 2px 2px; border-bottom: 1px solid #f0eee9 }
+.panel td.no { color: #888; width: 52px; font-size: 12px }
+.panel input[type=text] { width: 100%; font: inherit; padding: 3px 5px; border: 1px solid #ccc; border-radius: 4px }
+.panel select { font: inherit; font-size: 12px; padding: 2px; max-width: 98px }
+.panel tr.hid input[type=text] { color: #aaa; text-decoration: line-through }
+.panel tr.flash td { background: #fff3cf }
+.panel .gen { color: #999; font-size: 11px }
+.panel tr.own input[type=text] { border-color: #e0a12e; background: #fffaf0; font-weight: 700 }
+.panel .undo { border: 0; background: none; cursor: pointer; color: #b07a17; font-size: 14px; padding: 0 2px; visibility: hidden }
+.panel tr.own .undo { visibility: visible }
+.panel .setinfo { margin: -4px 0 10px; padding: 6px 8px; background: #fff6e0; border-radius: 6px; line-height: 1.5 }
+
+.toast { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 20; max-width: 560px; padding: 12px 18px;
+  background: #2b2f34; color: #fff; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.3); font-size: 14px; line-height: 1.6 }
+.toast b { color: #f0b443 }
+body { padding-top: var(--toolsH, 50px) }   /* 고정한 도구 줄 높이만큼(창 너비에 따라 줄 수가 바뀌어 스크립트가 잰다) */
+@media print {
+  body { padding-top: 0 !important }
+  .toast { display: none !important }
+  html, body { background: #fff }
+  .tools, .panel, .zoom { display: none !important }
+  .wrap { padding: 0; display: block }
+  .sheet { box-shadow: none; zoom: 1 !important; margin: 0 }
+}
+</style>
+</head>
+<body class="">
+<div class="tools">
+  <b>층별 배치도</b>
+  <span class="seg" id="bView"><button data-v="all" class="on">전체</button><button data-v="12" title="1·2층을 세로 한 장에">1·2F</button><button data-v="34" title="3·4층을 세로 한 장에">3·4F</button><button data-v="1F">1F</button><button data-v="2F">2F</button><button data-v="3F">3F</button><button data-v="4F">4F</button></span>
+  <span class="seg"><button id="bRotL" title="그림을 왼쪽으로 90도 돌리기">⟲</button><button id="bRotR" title="그림을 오른쪽으로 90도 돌리기">⟳</button></span>
+  <button id="bHere" title="지도에서 서 있는 곳을 누르고 바라보는 쪽으로 끌면, 그 방향대로 지도가 돌아갑니다">📍 내 위치 찍기</button>
+  <button id="bHereX" title="현재 위치 표시 지우기" hidden="">✕ 위치</button>
+  <label class="setpick">라벨 <select id="bSet" title="라벨 세트 고르기"><option value="">기본(공간 DB)</option></select></label>
+  <button id="bSetNew" title="지금 라벨을 바탕으로 새 라벨 세트를 만듭니다(예: 수능 시험장)">＋ 새 세트</button>
+  <button id="bSetMenu" title="지금 라벨 세트 이름 바꾸기·지우기" disabled="">⋯</button>
+  <span class="find"><input id="bFind" list="findList" placeholder="🔍 방 찾기" autocomplete="off" title="방 이름(로그인한 선생님은 사람 이름도)을 고르면 그 층에서 강조합니다"><button id="bFindX" title="강조 지우기" hidden="">✕</button></span>
+  <datalist id="findList"><option value="125 전환교육 지원실 (1F)"></option><option value="103 미술 준비실 (1F)"></option><option value="102 미술실 (1F)"></option><option value="152 통합교육 지원실 (1F)"></option><option value="151 가사실 (1F)"></option><option value="153 학습준비물실 (1F)"></option><option value="104 중정 (1F)"></option><option value="105 학생부 교무실 (1F)"></option><option value="150 공용준비실(환경실) (1F)"></option><option value="149 기술실 (1F)"></option><option value="107 홈베이스 (1F)"></option><option value="123 스튜디오 (1F)"></option><option value="108 물리학 실험실 (1F)"></option><option value="109 과학 준비실 (1F)"></option><option value="110 지구과학 실험실 (1F)"></option><option value="111 민원상담실 (1F)"></option><option value="112 중정 (1F)"></option><option value="115 미디어 스페이스 (과학 전시) (1F)"></option><option value="116 화학 실험실 (1F)"></option><option value="121 과학이론 강의실2 (1F)"></option><option value="120 과학이론 강의실1 (1F)"></option><option value="119 지능형 과학실 (1F)"></option><option value="117 생명과학 실험실 (1F)"></option><option value="145 숙직실 (1F)"></option><option value="144 식생활교육관(급식실) (1F)"></option><option value="144-1 조리실 (1F)"></option><option value="126 장애인 화장실 (1F)"></option><option value="124 운영위원회실 (1F)"></option><option value="101 행정실 (1F)"></option><option value="128 전시·대기 공간 (1F)"></option><option value="101-1 문서고 (1F)"></option><option value="127 실무사휴게실 (1F)"></option><option value="100 교장실 (1F)"></option><option value="131 보건실 (1F)"></option><option value="130 보건교육실 (1F)"></option><option value="129 위클래스 (1F)"></option><option value="244 영어교과실 (2F)"></option><option value="203 국어교과실1 (2F)"></option><option value="205 다인교과실1 (2F)"></option><option value="202 사회교과실 (2F)"></option><option value="204 1학년 정독실 (2F)"></option><option value="207 1학년 회의실 (2F)"></option><option value="240 교과실 (2F)"></option><option value="239 1학년 8반 (2F)"></option><option value="238 1학년 7반 (2F)"></option><option value="208 1학년 홈베이스 (2F)"></option><option value="243 인공지능실 (2F)"></option><option value="241 준비실 (2F)"></option><option value="210 1학년 6반 (2F)"></option><option value="211 1학년 5반 (2F)"></option><option value="212 1학년 4반 (2F)"></option><option value="209 1학년 교무실 (2F)"></option><option value="216 미디어 스페이스 (2F)"></option><option value="215 수학교과실1 (2F)"></option><option value="220 1학년 1반 (2F)"></option><option value="219 1학년 2반 (2F)"></option><option value="218 1학년 3반 (2F)"></option><option value="217 수학교과실2 (2F)"></option><option value="235 여샤워실 (2F)"></option><option value="234 남샤워실 (2F)"></option><option value="231 강당 (2F)"></option><option value="231-1 체육교사실 (2F)"></option><option value="231-2 무대 (2F)"></option><option value="231-3 방송장비실·기구창고 (2F)"></option><option value="229 체력단련실 (2F)"></option><option value="221 회의실 (2F)"></option><option value="201 교무행정센터 (본부교무실) (2F)"></option><option value="201-1 교무센터 물품보관소 (2F)"></option><option value="224 전산실 (2F)"></option><option value="225 여교사휴게실 (2F)"></option><option value="226 남교사휴게실 (2F)"></option><option value="237 체육활동실 (2F)"></option><option value="228 성적처리실 (2F)"></option><option value="227 교감실 (2F)"></option><option value="301 선택교과실1 (3F)"></option><option value="303 선택교과실2 (3F)"></option><option value="304 선택교과실3 (3F)"></option><option value="302 책상창고 (3F)"></option><option value="305 2학년 정독실 (3F)"></option><option value="306 2학년 회의실 (3F)"></option><option value="339 다인교과실2 (3F)"></option><option value="338 2학년 9반 (3F)"></option><option value="337 2학년 8반 (3F)"></option><option value="308 2학년 홈베이스 (3F)"></option><option value="310 2학년 7반 (3F)"></option><option value="311 2학년 6반 (3F)"></option><option value="312 2학년 5반 (3F)"></option><option value="309 2학년 교무실 (3F)"></option><option value="313 미디어 스페이스 (3F)"></option><option value="315 국어교과실2 (3F)"></option><option value="319 2학년 1반 (3F)"></option><option value="318 2학년 2반 (3F)"></option><option value="317 2학년 3반 (3F)"></option><option value="316 2학년 4반 (3F)"></option><option value="336 모두서원(도서실) (3F)"></option><option value="334 동아리실2 (3F)"></option><option value="333 동아리실1 (3F)"></option><option value="332 학생회실 (3F)"></option><option value="330 시청각실 (3F)"></option><option value="320 진로활동실1 (3F)"></option><option value="321 진로활동실2 (3F)"></option><option value="322 컴퓨터실 (3F)"></option><option value="323 사회교과실 (3F)"></option><option value="324 다인교과실3 (3F)"></option><option value="329 음악실 (3F)"></option><option value="327 부속실1 (3F)"></option><option value="328 부속실2 (3F)"></option><option value="401 3학년 8반 (4F)"></option><option value="402 3학년 7반 (4F)"></option><option value="404 3학년 6반 (4F)"></option><option value="407 진학상담실 (4F)"></option><option value="408 3학년 5반 (4F)"></option><option value="414 3학년 홈베이스 (4F)"></option><option value="403 3학년 정독실 (4F)"></option><option value="406 3학년 회의실 (4F)"></option><option value="409 3학년 교무실 (4F)"></option><option value="413 3학년 1반 (4F)"></option><option value="412 3학년 2반 (4F)"></option><option value="411 3학년 3반 (4F)"></option><option value="410 3학년 4반 (4F)"></option></datalist>
+  <button id="bEdit" title="방을 눌러 이름·분류를 고칩니다">✏️ 라벨 편집</button>
+  <button id="bNum" title="방 번호 보이기/숨기기" class="on">번호</button>
+  <button id="bCtx" title="건물 둘레(도로·산·운동장·주차장)를 옅은 선으로" class="on">주변</button>
+  <button id="bStair" title="계단 이름과 입구를 모르는 계단(입구?)을 보입니다. 입구를 짚을 때 켜고, 끝나면 끕니다">계단 확인</button>
+  <button id="bFurn" title="교실 책상·칠판, 문 표시" class="on">가구·문</button>
+  <select id="bPaper" title="종이 크기"><option value="A3">A3</option><option value="A4">A4</option></select>
+  <span class="sp"></span>
+  <span class="dbnote" id="dbNote">공간 DB 라벨 215곳 반영</span>
+  <span class="dirty">● 저장 안 한 변경</span>
+  <button id="bSave" title="라벨·세트를 담은 HTML 파일을 내려받습니다. 나중에 다시 열어 고칠 수 있습니다">💾 HTML 저장 (편집 가능)</button>
+  <button id="bPdf" title="인쇄 창에서 'PDF로 저장'을 골라 PDF 파일로 받습니다(선이 깨지지 않아 주석 달기 좋음). 라벨은 다시 고칠 수 없습니다">📄 PDF 저장 (편집 불가)</button>
+  <button id="bPrint">🖨️ 인쇄</button>
+</div>
+
+<div class="wrap">
+  <div class="sheet" id="sheet">
+    <header class="hd">
+      <div class="ttl">
+        <div class="t0" data-meta="school">BANGOK HIGH SCHOOL</div>
+        <div class="t1" data-meta="title">반곡고등학교 층별 배치도</div>
+      </div>
+      <span class="sp"></span>
+      <div class="when" data-meta="date">2026학년도</div>
+    </header>
+    <main class="floors">
+      <section class="fl show" data-floor="1F"><div class="fl-hd"><span class="badge">1F</span><span class="sub" data-sub="1F">과학·기술·미술실<br>행정실·교장실·보건실<br>식생활교육관</span></div><div class="fl-svg"></div></section>
+      <section class="fl show" data-floor="2F"><div class="fl-hd"><span class="badge">2F</span><span class="sub" data-sub="2F">1학년 교실<br>교과교실<br>강당<br>교무행정센터</span></div><div class="fl-svg"></div></section>
+      <section class="fl show" data-floor="3F"><div class="fl-hd"><span class="badge">3F</span><span class="sub" data-sub="3F">2학년 교실<br>선택교과실<br>도서실·시청각실·음악실</span></div><div class="fl-svg"></div></section>
+      <section class="fl show" data-floor="4F"><div class="fl-hd"><span class="badge">4F</span><span class="sub" data-sub="4F">3학년 교실<br>진학상담실</span></div><div class="fl-svg"></div></section>
+      <div class="key"><div class="key-t">범례</div><div class="legend" id="legend"></div><svg id="north" viewBox="-26 -17 52 34"></svg></div>
+    </main>
+    <footer class="ft">
+      <span data-meta="note"></span>
+      <span class="sp"></span>
+      <span data-meta="school2">반곡고등학교</span>
+    </footer>
+  </div>
+  <aside class="panel" id="panel" hidden=""></aside>
+  <div class="toast" id="toast" hidden=""></div>
+  <div class="zoom" id="zoom" title="화면 확대·축소(인쇄에는 영향 없음). Ctrl+휠로도 됩니다">
+    <button id="zIn" aria-label="확대">＋</button>
+    <input id="zRange" type="range" min="50" max="400" step="10" value="100" aria-label="확대 배율">
+    <button id="zOut" aria-label="축소">－</button>
+    <button id="zVal" class="zval" title="100%로">130%</button>
+  </div>
+</div>
+
+<!-- 도면(실측 m, 동쪽 +x · 남쪽 +y). build.mjs가 채운다. 손대지 않는다 -->
+<script id="plan-data" type="application/json">{"floors":{"1F":{"rooms":[["125","전환교육 지원실","office",0,8.1,0,7,{}],["N03-1","계단실-1","stair",8.1,11.7,0,7,{"entry":"S"}],["103","미술 준비실","util",11.7,15,0,7,{}],["102","미술실","room",15,27.9,0,7,{}],["N04-1m","남자화장실-1","toilet",27.9,31.95,0,7,{"gender":"m"}],["N04-1","여자화장실-1","toilet",31.95,36,0,7,{"gender":"f"}],["N05-1","탈의실·양치실·음수대","homebase",36,51,0,7,{}],["C1-1","복도","corridor",0,36,7,10.2,{}],["152","통합교육 지원실","room",0,8.1,10.2,17.1,{}],["151","가사실","lab",0,8.1,17.1,28.2,{}],["C1-2","복도","corridor",8.1,11.7,10.2,26.9,{}],["153","학습준비물실","util",11.7,19.8,10.2,17.1,{}],["104","중정","court",19.8,27.9,10.2,17.1,{}],["105","학생부 교무실","office",27.9,36,10.2,17.1,{}],["C1-3","복도","corridor",8.1,36,17.1,20.1,{}],["150","공용준비실(환경실)","util",11.7,17.5,20.1,26.9,{}],["149","기술실","lab",17.5,27.9,20.1,26.9,{}],["U1-1","TPS·TS·승강기","util",27.9,36,20.1,22.9,{}],["N03-4","계단실-4","stair",27.9,36,22.9,26.9,{"entry":"E"}],["107","홈베이스","homebase",36,51,7,34.1,{}],["123","스튜디오","room",39.3,47.7,26.9,30.5,{}],["N03-7","방송실","office",39.3,47.7,30.5,34.1,{}],["108","물리학 실험실","lab",51,59.1,4,14,{}],["109","과학 준비실","util",59.1,67.2,4,14,{}],["110","지구과학 실험실","lab",67.2,75.3,4,14,{}],["N03-2","계단실-2","stair",75.3,78.9,7,14,{"entry":"S"}],["N04-2","여자화장실-2","toilet",78.9,83.3,7,14,{"gender":"f"}],["N04-2m","남자화장실-2","toilet",83.3,87,7,14,{"gender":"m"}],["C1-4","복도","corridor",51,87,14,17,{}],["111","민원상담실","office",51,59.1,17,23.9,{}],["112","중정","court",59.1,67.2,17,23.9,{}],["115","미디어 스페이스(과학과 전시물)","lounge",67.2,75.3,17,23.9,{}],["C1-5","복도","corridor",75.3,78.9,17,23.9,{}],["116","화학 실험실","lab",78.9,87,17,23.9,{}],["C1-6","복도","corridor",51,87,23.9,26.9,{}],["121","과학이론 강의실2","class",51,59.1,26.9,34.1,{"board":"W"}],["120","과학이론 강의실1","class",59.1,67.2,26.9,34.1,{"board":"W"}],["119","지능형 과학실","lab",67.2,75.3,26.9,34.1,{}],["N03-3","계단실-3","stair",75.3,78.9,26.9,34.1,{"entry":"N"}],["117","생명과학 실험실","lab",78.9,87,26.9,34.1,{}],["N01-1","홀","hall",36,51,34.1,55.9,{}],["N03-g","중앙계단","stair",39.3,47.7,34.1,41.8,{"entry":"S"}],["N11","창고-3","util",25,33.2,42.8,51.7,{}],["N02-5","방풍실-5","room",25,33.2,51.7,55.9,{}],["145","숙직실","room",12.8,18.9,55.9,59.9,{}],["R1-2","관리실","office",12.8,18.9,59.9,64,{}],["N04-3","여자화장실-3","toilet",18.9,25,55.9,61.1,{"gender":"f"}],["N04-3m","남자화장실-3","toilet",25,29.1,55.9,61.1,{"gender":"m"}],["N03-5","계단실-5","stair",29.1,36,55.9,58.9,{"entry":"E"}],["U1-2","EPS·음수대","util",29.1,36,58.9,61.1,{}],["C1-11","복도","corridor",18.9,36,61.1,64,{}],["144","식생활교육관","room",12.8,36,64,84,{}],["144-1","조리실","util",12.8,36,84,101.6,{}],["C1-7","복도","corridor",36,39.3,55.9,80.2,{}],["N01-2","중앙현관","hall",39.3,51,55.9,80.2,{}],["126","장애인 화장실","toilet",36,39.3,80.2,90.5,{}],["N02-2","방풍실-2","room",39.3,51,80.2,84.2,{}],["N02-1","방풍실-1","room",51,55,42.8,51.7,{}],["124","운영위원회실","office",51,58.2,55.9,64,{}],["101","행정실","office",58.2,72.6,55.9,64,{}],["C1-8","복도","corridor",51,65.4,64,72.1,{}],["128","전시·대기 공간","hall",58.2,65.4,64,72.1,{}],["101-1","문서고","util",65.4,72.6,64,68.6,{}],["127","공용휴게실","office",65.4,72.6,68.6,72.1,{}],["C1-10","복도","corridor",51,65.4,72.1,80.2,{}],["N03-6","계단실-6","stair",54.3,58.2,74.1,80.2,{"walled":true,"entry":"N"}],["100","교장실","office",65.4,72.6,72.1,80.2,{}],["C1-9","복도","corridor",51,72.6,80.2,83,{}],["131","보건실","office",51,58.2,83,90.5,{}],["130","보건교육실","room",58.2,65.4,83,90.5,{}],["129","위클래스","office",65.4,72.6,83,90.5,{}]],"doors":[["h",7,0.34,1.35,"S","a"],["h",7,6.72,7.7,"S","b"],["h",7,15.28,16.38,"S","a"],["h",7,16.38,16.96,"S","b"],["h",7,26.51,27.53,"S","b"],["h",7,30.68,31.67,"S","b"],["h",7,34.73,35.43,"S","b"],["h",10.2,0.44,1.45,"S","a"],["h",10.2,6.62,7.63,"S","b"],["h",10.2,18.34,19.41,"S","b"],["h",10.2,28.27,29.33,"S","a"],["h",14,57.71,58.73,"S","b"],["h",14,65.82,66.83,"S","b"],["h",14,73.93,74.94,"S","b"],["h",17,57.63,58.73,"S","b"],["h",17,58.18,59.1,"N","b"],["h",17,67.57,68.64,"S","a"],["h",17,79.29,80.38,"S","a"],["h",17,80.38,80.96,"S","b"],["h",17.1,18.34,19.41,"N","b"],["h",17.1,28.27,29.33,"N","a"],["h",20.1,11.98,13.07,"S","a"],["h",20.1,13.07,13.71,"S","b"],["h",20.1,17.75,18.89,"N","a"],["h",20.1,26.73,27.7,"N","b"],["h",23.9,57.63,58.69,"N","b"],["h",23.9,58.18,59.06,"S","b"],["h",23.9,67.57,68.64,"N","a"],["h",23.9,79.29,80.38,"N","a"],["h",23.9,80.38,81.02,"N","b"],["h",26.9,7.83,8.93,"N","a"],["h",26.9,57.71,58.73,"N","b"],["h",26.9,59.44,60.59,"N","a"],["h",26.9,65.82,66.83,"N","b"],["h",26.9,67.55,68.7,"N","a"],["h",26.9,73.93,74.94,"N","b"],["h",26.9,79.05,80.07,"N","a"],["h",55.9,37.86,38.74,"N","b"],["h",55.9,45.37,46.25,"N","b"],["h",55.9,48.22,49.1,"N","a"],["h",59.9,17.4,18.3,"S","b"],["h",61.1,20.74,21.72,"S","b"],["h",61.1,25.85,26.83,"S","a"],["h",61.1,29.2,29.94,"N","a"],["h",64,51.4,52.34,"S","a"],["h",72.1,55.98,56.89,"N","b"],["h",72.1,63.18,64.09,"N","b"],["h",80.2,42.93,43.87,"N","a"],["h",80.2,44.1,45.1,"N","a"],["h",80.2,45.1,46.1,"N","b"],["h",80.2,46.31,47.25,"N","b"],["h",80.2,52.33,53.21,"N","a"],["h",80.2,58.8,59.53,"N","a"],["h",83,51.35,52.36,"S","a"],["h",83,56.83,57.84,"S","b"],["h",83,58.54,59.56,"S","a"],["h",83,64.02,65.03,"S","b"],["h",83,65.74,66.75,"S","a"],["h",83,71.76,72.81,"N","a"],["h",84,25.43,26.24,"S","a"],["h",84.2,44.1,45.1,"N","a"],["h",84.2,45.1,46.1,"N","b"],["v",8.1,17.61,18.62,"E","a"],["v",15,0.3,1.2,"W","a"],["v",18.9,62.6,63.6,"W","b"],["v",33.2,53.74,54.91,"W","b"],["v",36,7.47,8.38,"E","a"],["v",36,17.35,18.26,"E","a"],["v",36,66.95,67.95,"W","a"],["v",36,67.95,68.95,"W","b"],["v",36,73.15,74.15,"W","a"],["v",36,74.15,75.15,"W","b"],["v",36,76.95,77.95,"W","a"],["v",36,77.95,78.95,"W","b"],["v",39.3,34.82,35.83,"E","a"],["v",39.3,69.85,70.77,"E","b"],["v",39.3,77.95,78.83,"E","b"],["v",51,13.51,14.6,"E","a"],["v",51,26.22,27.32,"E","b"],["v",51,43.61,44.62,"W","a"],["v",51,44.59,45.54,"W","b"],["v",51,46.21,47.35,"E","a"],["v",51,47.18,48.34,"E","b"],["v",51,54.44,55.28,"E","b"],["v",51,77.95,78.86,"W","b"],["v",55,43.37,44.7,"E","a"],["v",55,44.49,45.82,"E","b"],["v",55,46.15,47.3,"W","a"],["v",55,47.24,48.29,"E","b"],["v",58.2,56,56.9,"E","a"],["v",58.2,65.24,66.08,"E","a"],["v",58.2,66.12,67.17,"W","b"],["v",78.9,3.59,4.61,"W","b"]]},"2F":{"rooms":[["244","영어교과실","class",0,8.1,0,7,{"board":"E"}],["N03-1","계단실-1","stair",8.1,11.7,0,7,{"entry":"S"}],["203","국어교과실1","class",11.7,19.8,0,7,{"board":"E"}],["205","다인교과실1","class",19.8,27.9,0,7,{"board":"E"}],["N04-1m","남자화장실-1","toilet",27.9,31.95,0,7,{"gender":"m"}],["N04-1","여자화장실-1","toilet",31.95,36,0,7,{"gender":"f"}],["N05-2","탈의실·양치실·음수대","homebase",36,51,0,7,{}],["C2-1","복도","corridor",0,36,7,10.2,{}],["202","사회교과실","class",0,8.1,10.2,17.1,{"board":"S"}],["C2-2","복도","corridor",8.1,11.7,10.2,20.1,{}],["204","1학년 정독실","room",11.7,19.8,10.2,17.1,{}],["V2-1","오픈","void",19.8,27.9,10.2,17.1,{}],["207","1학년 회의실","office",27.9,36,10.2,17.1,{}],["C2-3","복도","corridor",0,36,17.1,20.1,{}],["240","교과실","class",0,8.1,20.1,26.9,{"board":"E"}],["C2-4","복도","corridor",8.1,11.7,20.1,26.9,{}],["239","1학년 8반","class",11.7,19.8,20.1,26.9,{"board":"E"}],["238","1학년 7반","class",19.8,27.9,20.1,26.9,{"board":"E"}],["U2-1","TPS·TS·승강기","util",27.9,36,20.1,22.9,{}],["N03-4","계단실-4","stair",27.9,36,22.9,26.9,{"entry":"E"}],["208","1학년 홈베이스","homebase",36,51,7,34.1,{}],["N03-g","중앙계단","stair",39.3,47.7,31.9,41.8,{"entry":"N"}],["V2-2","오픈","void",39.3,47.7,41.8,55.9,{}],["C2-5","연결 복도","corridor",36,39.3,34.1,55.9,{}],["C2-6","연결 복도","corridor",47.7,51,34.1,55.9,{}],["V2-3","오픈","void",33.2,36,26.9,34.1,{}],["243","인공지능실","lab",25,36,34.1,49.3,{}],["241","준비실","util",25,36,49.3,51.7,{}],["V2-4","오픈","void",33.2,36,51.7,55.9,{}],["210","1학년 6반","class",51,59.1,7,14,{"board":"E"}],["211","1학년 5반","class",59.1,67.2,7,14,{"board":"E"}],["212","1학년 4반","class",67.2,75.3,7,14,{"board":"E"}],["N03-2","계단실-2","stair",75.3,78.9,7,14,{"entry":"S"}],["N04-2","여자화장실-2","toilet",78.9,83.3,7,14,{"gender":"f"}],["N04-2m","남자화장실-2","toilet",83.3,87,7,14,{"gender":"m"}],["C2-7","복도","corridor",51,87,14,17,{}],["209","1학년 교무실","office",51,59.1,17,23.9,{}],["V2-5","오픈","void",59.1,67.2,17,23.9,{}],["216","미디어 스페이스","lounge",67.2,75.3,17,23.9,{}],["C2-8","복도","corridor",75.3,78.9,17,23.9,{}],["215","수학교과실1","class",78.9,87,17,23.9,{"board":"N"}],["C2-9","복도","corridor",51,87,23.9,26.9,{}],["220","1학년 1반","class",51,59.1,26.9,34.1,{"board":"W"}],["219","1학년 2반","class",59.1,67.2,26.9,34.1,{"board":"W"}],["218","1학년 3반","class",67.2,75.3,26.9,34.1,{"board":"W"}],["N03-3","계단실-3","stair",75.3,78.9,26.9,34.1,{"entry":"N"}],["217","수학교과실2","class",78.9,87,26.9,34.1,{"board":"W"}],["235","여샤워실","toilet",10.8,13.8,55.9,61.1,{}],["234","남샤워실","toilet",13.8,16.8,55.9,61.1,{}],["N04-3","여자화장실-3","toilet",16.8,25,55.9,61.1,{"gender":"f"}],["N04-3m","남자화장실-3","toilet",25,29.1,55.9,61.1,{"gender":"m"}],["N03-5","계단실-5","stair",29.1,36,55.9,58.9,{"entry":"E"}],["U2-2","EPS·음수대","util",29.1,36,58.9,61.1,{}],["C2-10","복도","corridor",10.8,36,61.1,64,{}],["231","강당","gym",16.8,36,64,101.6,{}],["231-1","방송실·체육교사실","office",10.8,16.8,64,72.1,{}],["231-2","무대","stage",10.8,16.8,72.1,88.3,{}],["231-3","준비실·기구창고","util",10.8,16.8,88.3,101.6,{}],["C2-11","복도","corridor",36,39.3,55.9,72.1,{}],["H2-2","홀","hall",39.3,51,55.9,72.1,{}],["N02-3","방풍실-3","room",36,41.8,72.1,77.4,{}],["229","체력단련실","room",41.8,51,72.1,80.2,{}],["221","회의실","office",51,58.2,55.9,64,{}],["201","교무행정센터","office",58.2,72.6,55.9,64,{}],["C2-12","복도","corridor",51,65.4,64,72.1,{}],["201-1","교무센터 물품보관소","util",65.4,72.6,64,66.2,{}],["224","전산실","office",65.4,72.6,66.2,72.1,{}],["225","여교사휴게실","office",65.4,72.6,72.1,75.6,{}],["226","남교사휴게실","office",65.4,72.6,75.6,80.2,{}],["C2-13","복도","corridor",51,65.4,72.1,80.2,{}],["N03-6","계단실-6","stair",54.3,58.2,74.1,80.2,{"walled":true,"entry":"N"}],["V2-6","오픈","void",58.2,62.6,72.1,80.2,{}],["C2-14","복도","corridor",51,72.6,80.2,83,{}],["237","체육활동실","room",51,59,83,90.5,{}],["228","성적처리실","office",59,67.2,83,90.5,{}],["227","교감실","office",67.2,72.6,83,90.5,{}]],"doors":[["h",7,0.34,1.35,"S","a"],["h",7,6.72,7.7,"S","b"],["h",7,12.04,13.05,"S","a"],["h",7,18.43,19.4,"S","b"],["h",7,20.15,21.16,"S","a"],["h",7,26.51,27.53,"S","b"],["h",7,30.68,31.67,"S","b"],["h",7,32.21,33.18,"S","a"],["h",7,34.73,35.43,"S","b"],["h",10.2,0.44,1.45,"S","a"],["h",10.2,6.62,7.63,"S","b"],["h",10.2,18.34,19.41,"S","b"],["h",10.2,28.27,29.33,"S","a"],["h",14,57.71,58.73,"S","b"],["h",14,59.47,60.44,"S","a"],["h",14,65.82,66.83,"S","b"],["h",14,67.54,68.55,"S","a"],["h",14,73.93,74.94,"S","b"],["h",17,57.63,58.73,"S","b"],["h",17,67.57,68.64,"S","a"],["h",17.1,18.34,19.41,"N","b"],["h",17.1,28.27,29.33,"N","a"],["h",20.1,6.72,7.7,"N","b"],["h",20.1,12.04,13.05,"N","a"],["h",20.1,18.43,19.4,"N","b"],["h",20.1,20.15,21.16,"N","a"],["h",20.1,26.51,27.53,"N","b"],["h",23.9,57.63,58.69,"N","b"],["h",23.9,67.57,68.64,"N","a"],["h",23.9,79.35,80.36,"N","a"],["h",23.9,85.53,86.54,"N","b"],["h",26.9,57.71,58.73,"N","b"],["h",26.9,59.47,60.44,"N","a"],["h",26.9,65.82,66.83,"N","b"],["h",26.9,67.54,68.55,"N","a"],["h",26.9,73.93,74.94,"N","b"],["h",26.9,79.24,80.26,"N","a"],["h",26.9,85.63,86.61,"N","b"],["h",55.9,37.86,38.77,"S","b"],["h",61.1,13.01,14.02,"S","b"],["h",61.1,15.74,16.76,"S","a"],["h",61.1,20.74,21.72,"S","b"],["h",61.1,25.85,26.83,"S","a"],["h",61.1,29.2,29.94,"N","a"],["h",64,17.14,18.49,"N","a"],["h",64,18.49,19.82,"N","b"],["h",64,51.4,52.34,"N","a"],["h",64,56.85,57.6,"N","b"],["h",64,65.84,66.73,"S","a"],["h",72.1,40.29,41.18,"N","b"],["h",72.1,49.67,50.5,"S","b"],["h",80.2,64.04,64.95,"N","b"],["h",83,51.35,52.36,"S","a"],["h",83,56.83,57.84,"S","b"],["h",83,59.35,60.36,"S","a"],["h",83,65.72,66.73,"S","b"],["h",83,71.05,71.8,"S","b"],["v",0,19.47,20.48,"E","b"],["v",16.8,66.07,67.07,"E","a"],["v",16.8,94.88,95.9,"W","b"],["v",36,7.49,8.4,"E","a"],["v",36,17.37,18.28,"E","a"],["v",36,34.46,35.21,"W","a"],["v",36,40.19,41.27,"W","a"],["v",36,43.87,44.97,"W","b"],["v",36,48.13,48.88,"W","b"],["v",36,50.5,51.51,"W","b"],["v",36,65.74,67.07,"E","a"],["v",36,67.07,68.5,"E","b"],["v",36,68.29,69.69,"E","a"],["v",36,69.67,71.09,"E","b"],["v",36,77.78,79.05,"E","b"],["v",51,13.56,14.58,"E","a"],["v",51,15.74,16.7,"W","b"],["v",51,24.19,25.1,"W","a"],["v",51,26.26,27.27,"E","b"],["v",51,69.86,70.77,"W","b"]]},"3F":{"rooms":[["301","선택교과실1","class",0,8.1,0,7,{"board":"E"}],["N03-1","계단실-1","stair",8.1,11.7,0,7,{"entry":"S"}],["303","선택교과실2","class",11.7,19.8,0,7,{"board":"E"}],["304","선택교과실3","class",19.8,27.9,0,7,{"board":"E"}],["N04-1m","남자화장실-1","toilet",27.9,31.95,0,7,{"gender":"m"}],["N04-1","여자화장실-1","toilet",31.95,36,0,7,{"gender":"f"}],["N05-3","탈의실·양치실·음수대","homebase",36,51,0,7,{}],["C3-1","복도","corridor",0,36,7,10.2,{}],["302","책상창고","util",0,8.1,10.2,17.1,{}],["C3-2","복도","corridor",8.1,11.7,10.2,26.9,{}],["305","2학년 정독실","room",11.7,19.8,10.2,17.1,{}],["V3-1","오픈","void",19.8,27.9,10.2,17.1,{}],["306","2학년 회의실","office",27.9,36,10.2,17.1,{}],["C3-3","복도","corridor",0,36,17.1,20.1,{}],["339","다인교과실2","class",0,8.1,20.1,26.9,{"board":"E"}],["338","2학년 9반","class",11.7,19.8,20.1,26.9,{"board":"E"}],["337","2학년 8반","class",19.8,27.9,20.1,26.9,{"board":"E"}],["U3-1","TPS·TS·승강기","util",27.9,36,20.1,22.9,{}],["N03-4","계단실-4","stair",27.9,36,22.9,26.9,{"entry":"E"}],["308","2학년 홈베이스","homebase",36,51,7,34.1,{}],["310","2학년 7반","class",51,59.1,7,14,{"board":"E"}],["311","2학년 6반","class",59.1,67.2,7,14,{"board":"E"}],["312","2학년 5반","class",67.2,75.3,7,14,{"board":"E"}],["N03-2","계단실-2","stair",75.3,78.9,7,14,{"entry":"S"}],["N04-2","여자화장실-2","toilet",78.9,83.3,7,14,{"gender":"f"}],["N04-2m","남자화장실-2","toilet",83.3,87,7,14,{"gender":"m"}],["C3-4","복도","corridor",51,87,14,17,{}],["309","2학년 교무실","office",51,59.1,17,23.9,{}],["V3-2","오픈","void",59.1,67.2,17,23.9,{}],["313","미디어 스페이스","lounge",67.2,75.3,17,23.9,{}],["C3-5","복도","corridor",75.3,78.9,17,23.9,{}],["315","국어교과실2","class",78.9,87,17,23.9,{"board":"N"}],["C3-6","복도","corridor",51,87,23.9,26.9,{}],["319","2학년 1반","class",51,59.1,26.9,34.1,{"board":"W"}],["318","2학년 2반","class",59.1,67.2,26.9,34.1,{"board":"W"}],["317","2학년 3반","class",67.2,75.3,26.9,34.1,{"board":"W"}],["N03-3","계단실-3","stair",75.3,78.9,26.9,34.1,{"entry":"N"}],["316","2학년 4반","class",78.9,87,26.9,34.1,{"board":"W"}],["336","도서실(모두서원)","room",25,39.3,34.1,55.9,{}],["V3-3","오픈","void",39.3,47.7,34.1,55.9,{}],["C3-7","연결 복도","corridor",47.7,51,34.1,55.9,{}],["334","동아리실2","room",10.8,14.8,55.9,61.2,{}],["333","동아리실1","room",14.8,18.6,55.9,61.2,{}],["N04-3","여자화장실-3","toilet",18.6,25,55.9,61.2,{"gender":"f"}],["N04-3m","남자화장실-3","toilet",25,29.1,55.9,61.2,{"gender":"m"}],["N03-5","계단실-5","stair",29.1,36,55.9,58.9,{"entry":"E"}],["U3-2","EPS·음수대","util",29.1,36,58.9,61.2,{}],["C3-8","복도","corridor",10.8,36,61.2,64,{}],["332","학생회실","office",10.8,16.8,64,72.1,{}],["V3-4","강당 상부","void",16.8,36,64,101.6,{}],["V3-5","무대·준비실 상부","void",10.8,16.8,72.1,101.6,{}],["H3-2","홀","hall",36,47.7,55.9,64,{}],["330","시청각실","room",36,47.7,64,80.2,{}],["C3-9","복도","corridor",47.7,51,55.9,80.2,{}],["320","진로활동실1","room",51,58.2,55.9,64,{}],["321","진로활동실2","room",58.2,62.6,55.9,64,{}],["C3-11","복도","corridor",62.6,65.4,55.9,64,{}],["322","컴퓨터실","lab",65.4,72.6,55.9,64,{}],["C3-10","복도","corridor",51,65.4,64,80.2,{}],["323","사회교과실","class",65.4,72.6,64,72.1,{"board":"S"}],["324","다인교과실3","class",65.4,72.6,72.1,80.2,{"board":"S"}],["N03-6","계단실-6","stair",54.3,58.2,74.1,80.2,{"entry":"N"}],["329","음악실","room",51,65.4,80.2,90.5,{}],["327","부속실1","room",65.4,72.6,80.2,85.3,{}],["328","부속실2","room",65.4,72.6,85.3,90.5,{}]],"doors":[["h",7,0.34,1.35,"S","a"],["h",7,6.72,7.7,"S","b"],["h",7,12.04,13.05,"S","a"],["h",7,18.43,19.4,"S","b"],["h",7,20.15,21.16,"S","a"],["h",7,26.51,27.53,"S","b"],["h",7,30.68,31.67,"S","b"],["h",7,32.22,33.18,"S","a"],["h",7,34.73,35.43,"S","b"],["h",10.2,0.44,1.45,"S","a"],["h",10.2,6.62,7.63,"S","b"],["h",10.2,18.34,19.41,"S","b"],["h",10.2,28.27,29.33,"S","a"],["h",14,57.71,58.73,"S","b"],["h",14,59.47,60.44,"S","a"],["h",14,65.82,66.83,"S","b"],["h",14,67.54,68.55,"S","a"],["h",14,73.93,74.94,"S","b"],["h",17,57.63,58.73,"S","b"],["h",17,67.57,68.64,"S","a"],["h",17.1,18.34,19.41,"N","b"],["h",17.1,28.27,29.33,"N","a"],["h",20.1,6.72,7.7,"N","b"],["h",20.1,12.04,13.05,"N","a"],["h",20.1,18.43,19.4,"N","b"],["h",20.1,20.15,21.16,"N","a"],["h",20.1,26.51,27.53,"N","b"],["h",23.9,57.63,58.69,"N","b"],["h",23.9,67.57,68.64,"N","a"],["h",23.9,79.35,80.36,"N","a"],["h",23.9,85.53,86.54,"N","b"],["h",26.9,57.71,58.73,"N","b"],["h",26.9,59.47,60.44,"N","a"],["h",26.9,65.82,66.83,"N","b"],["h",26.9,67.54,68.55,"N","a"],["h",26.9,73.93,74.94,"N","b"],["h",26.9,79.24,80.26,"N","a"],["h",26.9,85.63,86.61,"N","b"],["h",34.1,37.39,38.31,"N","b"],["h",55.9,37.86,38.77,"S","b"],["h",61.2,20.74,21.72,"S","b"],["h",61.2,25.85,26.83,"S","a"],["h",61.2,29.2,29.94,"N","a"],["h",64,15.47,16.31,"S","b"],["h",64,51.42,52.38,"N","a"],["h",64,56.85,57.6,"N","b"],["h",64,58.8,59.53,"N","a"],["h",80.2,52.53,53.95,"S","b"],["h",80.2,62.54,63.83,"S","a"],["v",0,19.47,20.48,"E","b"],["v",36,7.49,8.4,"E","a"],["v",36,17.37,18.28,"E","a"],["v",47.7,57.29,58.2,"W","a"],["v",47.7,63.98,64.89,"E","a"],["v",47.7,66.26,67.64,"E","a"],["v",47.7,67.64,69,"E","b"],["v",47.7,77.24,78.54,"E","a"],["v",47.7,78.58,79.9,"E","b"],["v",51,13.56,14.58,"E","a"],["v",51,15.74,16.7,"W","b"],["v",51,24.19,25.1,"W","a"],["v",51,26.26,27.27,"E","b"],["v",51,79.97,81.34,"E","a"],["v",65.4,56.24,57.25,"W","a"],["v",65.4,62.6,63.62,"W","b"],["v",65.4,64.32,65.33,"W","a"],["v",65.4,70.71,71.72,"W","b"],["v",65.4,72.43,73.44,"W","a"],["v",65.4,78.12,79.14,"W","a"]]},"4F":{"rooms":[["401","3학년 8반","class",0,8.1,0,7,{"board":"E"}],["N03-1","계단실-1","stair",8.1,11.7,0,7,{"entry":"S"}],["402","3학년 7반","class",11.7,19.8,0,7,{"board":"E"}],["404","3학년 6반","class",19.8,27.9,0,7,{"board":"E"}],["N04-1m","남자화장실-1","toilet",27.9,31.95,0,7,{"gender":"m"}],["N04-1","여자화장실-1","toilet",31.95,36,0,7,{"gender":"f"}],["407","진학상담실","office",36,39.3,0,7,{}],["408","3학년 5반","class",39.3,47.7,0,7,{"board":"W"}],["C4-1","복도","corridor",0,47.7,7,10.2,{}],["414","3학년 홈베이스","room",0,8.1,10.2,17.1,{}],["C4-2","복도","corridor",8.1,11.7,10.2,26.9,{}],["403","3학년 정독실","room",11.7,19.8,10.2,17.1,{}],["V4-1","오픈","void",19.8,27.9,10.2,17.1,{}],["406","3학년 회의실","office",27.9,36,10.2,17.1,{}],["C4-3","복도","corridor",36,39.3,10.2,26.9,{}],["409","3학년 교무실","office",39.3,47.7,10.2,17.1,{}],["C4-4","복도","corridor",0,47.7,17.1,20.1,{}],["413","3학년 1반","class",0,8.1,20.1,26.9,{"board":"E"}],["412","3학년 2반","class",11.7,19.8,20.1,26.9,{"board":"E"}],["411","3학년 3반","class",19.8,27.9,20.1,26.9,{"board":"E"}],["U4-1","TPS·TS·승강기","util",27.9,36,20.1,22.9,{}],["N03-4","계단실-4","stair",27.9,36,22.9,26.9,{"entry":"E"}],["410","3학년 4반","class",39.3,47.7,20.1,26.9,{"board":"W"}]],"doors":[["h",7,0.34,1.35,"S","a"],["h",7,6.72,7.7,"S","b"],["h",7,12.04,13.05,"S","a"],["h",7,18.43,19.4,"S","b"],["h",7,20.15,21.16,"S","a"],["h",7,26.51,27.53,"S","b"],["h",7,30.68,31.67,"S","b"],["h",7,32.21,33.18,"S","a"],["h",7,34.73,35.43,"S","b"],["h",7,36.58,37.33,"N","a"],["h",7,39.94,40.95,"S","a"],["h",7,46.33,47.34,"S","b"],["h",10.2,0.44,1.45,"S","a"],["h",10.2,6.62,7.63,"S","b"],["h",10.2,18.34,19.41,"S","b"],["h",10.2,39.09,40.1,"S","a"],["h",17.1,18.34,19.41,"N","b"],["h",17.1,28.27,29.33,"N","a"],["h",20.1,6.72,7.7,"N","b"],["h",20.1,12.04,13.05,"N","a"],["h",20.1,18.43,19.4,"N","b"],["h",20.1,20.15,21.16,"N","a"],["h",20.1,26.51,27.53,"N","b"],["h",20.1,39.94,40.95,"N","a"],["v",0,19.47,20.48,"E","b"],["v",27.9,9.86,11.08,"E","a"],["v",39.3,15.91,16.89,"E","b"],["v",47.7,17.36,18.51,"E","a"],["v",47.7,19.47,20.48,"W","b"]]}},"columns":[[39.3,7],[47.7,7],[39.3,14],[47.7,14],[39.3,20.1],[47.7,20.1],[39.3,26.9],[47.7,26.9],[39.3,55.9],[47.7,55.9],[39.3,64],[47.7,64],[39.3,42.8],[47.7,42.8],[39.3,51.7],[47.7,51.7],[39.3,72.1],[47.7,72.1]]}</script>
+
+<!-- 라벨: 화면의 [라벨 편집]으로 고치고 [HTML 저장]으로 저장된다. rooms["2F"]["240"] = { name, cat, hide }. 이름의 '/'는 줄바꿈 -->
+<script id="labels" type="application/json">{
+ "meta": {
+  "school": "BANGOK HIGH SCHOOL",
+  "title": "반곡고등학교 층별 배치도",
+  "note": "",
+  "date": "2026학년도",
+  "school2": "반곡고등학교",
+  "paper": "A3",
+  "showNum": true,
+  "furniture": true,
+  "subs": {
+   "1F": "과학·기술·미술실 / 행정실·교장실·보건실 / 식생활교육관",
+   "2F": "1학년 교실 / 교과교실 / 강당 / 교무행정센터",
+   "3F": "2학년 교실 / 선택교과실 / 도서실·시청각실·음악실",
+   "4F": "3학년 교실 / 진학상담실"
+  },
+  "around": {
+   "N": "한누리대로",
+   "E": "시청대로",
+   "S": "주차장",
+   "W": "괴화산"
+  },
+  "view": "all",
+  "turn": 0,
+  "context": true,
+  "stairCheck": false,
+  "dbAt": "2026. 10. 26."
+ },
+ "rooms": {
+  "1F": {
+   "103": {
+    "hide": true
+   },
+   "104": {
+    "hide": true
+   },
+   "112": {
+    "hide": true
+   },
+   "123": {
+    "hide": true
+   },
+   "127": {
+    "name": "실무사휴게실",
+    "hide": true
+   },
+   "128": {
+    "hide": true
+   },
+   "144": {
+    "name": "식생활교육관(급식실)"
+   },
+   "101-1": {
+    "hide": true
+   },
+   "144-1": {
+    "hide": true
+   },
+   "N01-1": {
+    "name": "중앙계단"
+   },
+   "N02-1": {
+    "name": "신발장",
+    "cat": "hall",
+    "hide": false
+   },
+   "N02-2": {
+    "name": "신발장",
+    "cat": "hall",
+    "hide": false
+   },
+   "N02-5": {
+    "name": "야외 데크"
+   },
+   "N11": {
+    "name": "야외 테라스",
+    "cat": "hall"
+   },
+   "N05-1": {
+    "name": "3D 프린터실"
+   },
+   "U1-2": {
+    "hide": true
+   }
+  },
+  "2F": {
+   "201": {
+    "name": "교무행정센터/(본부교무실)"
+   },
+   "201-1": {
+    "hide": true
+   },
+   "231-1": {
+    "name": "체육교사실"
+   },
+   "231-3": {
+    "name": "방송장비실·기구창고"
+   },
+   "U2-2": {
+    "hide": true
+   },
+   "N05-2": {
+    "name": "사물함"
+   }
+  },
+  "3F": {
+   "327": {
+    "hide": true
+   },
+   "328": {
+    "hide": true
+   },
+   "336": {
+    "name": "모두서원(도서실)"
+   },
+   "U3-2": {
+    "hide": true
+   },
+   "V3-4": {
+    "hide": true
+   },
+   "V3-5": {
+    "hide": true
+   },
+   "N05-3": {
+    "name": "사물함"
+   }
+  }
+ },
+ "sets": [],
+ "active": "",
+ "db": {
+  "1F": {
+   "100": {
+    "label": "교장실",
+    "type": "office",
+    "board": ""
+   },
+   "101": {
+    "label": "행정실",
+    "type": "office",
+    "board": ""
+   },
+   "102": {
+    "label": "미술실",
+    "type": "room",
+    "board": ""
+   },
+   "103": {
+    "label": "미술 준비실",
+    "type": "util",
+    "board": ""
+   },
+   "104": {
+    "label": "중정",
+    "type": "court",
+    "board": ""
+   },
+   "105": {
+    "label": "학생부 교무실",
+    "type": "office",
+    "board": ""
+   },
+   "107": {
+    "label": "홈베이스",
+    "type": "homebase",
+    "board": ""
+   },
+   "108": {
+    "label": "물리학 실험실",
+    "type": "lab",
+    "board": ""
+   },
+   "109": {
+    "label": "과학 준비실",
+    "type": "util",
+    "board": ""
+   },
+   "110": {
+    "label": "지구과학 실험실",
+    "type": "lab",
+    "board": ""
+   },
+   "111": {
+    "label": "민원상담실",
+    "type": "office",
+    "board": ""
+   },
+   "112": {
+    "label": "중정",
+    "type": "court",
+    "board": ""
+   },
+   "115": {
+    "label": "미디어 스페이스(과학과 전시물)",
+    "type": "lounge",
+    "board": ""
+   },
+   "116": {
+    "label": "화학 실험실",
+    "type": "lab",
+    "board": ""
+   },
+   "117": {
+    "label": "생명과학 실험실",
+    "type": "lab",
+    "board": ""
+   },
+   "119": {
+    "label": "지능형 과학실",
+    "type": "lab",
+    "board": ""
+   },
+   "120": {
+    "label": "과학이론 강의실1",
+    "type": "class",
+    "board": "W"
+   },
+   "121": {
+    "label": "과학이론 강의실2",
+    "type": "class",
+    "board": "W"
+   },
+   "123": {
+    "label": "스튜디오",
+    "type": "room",
+    "board": ""
+   },
+   "124": {
+    "label": "운영위원회실",
+    "type": "office",
+    "board": ""
+   },
+   "125": {
+    "label": "전환교육 지원실",
+    "type": "class",
+    "board": ""
+   },
+   "126": {
+    "label": "장애인 화장실",
+    "type": "toilet",
+    "board": ""
+   },
+   "127": {
+    "label": "실무사휴게실",
+    "type": "office",
+    "board": ""
+   },
+   "128": {
+    "label": "전시·대기 공간",
+    "type": "hall",
+    "board": ""
+   },
+   "129": {
+    "label": "위클래스",
+    "type": "office",
+    "board": ""
+   },
+   "130": {
+    "label": "보건교육실",
+    "type": "room",
+    "board": ""
+   },
+   "131": {
+    "label": "보건실",
+    "type": "office",
+    "board": ""
+   },
+   "144": {
+    "label": "식생활교육관(급식실)",
+    "type": "room",
+    "board": ""
+   },
+   "145": {
+    "label": "숙직실",
+    "type": "room",
+    "board": ""
+   },
+   "149": {
+    "label": "기술실",
+    "type": "lab",
+    "board": ""
+   },
+   "150": {
+    "label": "공용준비실(환경실)",
+    "type": "util",
+    "board": ""
+   },
+   "151": {
+    "label": "가사실",
+    "type": "lab",
+    "board": ""
+   },
+   "152": {
+    "label": "통합교육 지원실",
+    "type": "room",
+    "board": ""
+   },
+   "153": {
+    "label": "학습준비물실",
+    "type": "util",
+    "board": ""
+   },
+   "N03-1": {
+    "label": "계단실-1",
+    "type": "stair",
+    "board": ""
+   },
+   "N04-1": {
+    "label": "화장실-1",
+    "type": "toilet",
+    "board": ""
+   },
+   "N05-1": {
+    "label": "3D 프린터실",
+    "type": "homebase",
+    "board": ""
+   },
+   "C1-1": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C1-2": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C1-3": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "U1-1": {
+    "label": "TPS·TS·승강기",
+    "type": "util",
+    "board": ""
+   },
+   "N03-4": {
+    "label": "계단실-4",
+    "type": "stair",
+    "board": ""
+   },
+   "N03-7": {
+    "label": "방송실",
+    "type": "office",
+    "board": ""
+   },
+   "N03-2": {
+    "label": "계단실-2",
+    "type": "stair",
+    "board": ""
+   },
+   "N04-2": {
+    "label": "화장실-2",
+    "type": "toilet",
+    "board": ""
+   },
+   "C1-4": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C1-5": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C1-6": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "N03-3": {
+    "label": "계단실-3",
+    "type": "stair",
+    "board": ""
+   },
+   "N01-1": {
+    "label": "중앙계단",
+    "type": "hall",
+    "board": ""
+   },
+   "N11": {
+    "label": "야외 테라스",
+    "type": "util",
+    "board": ""
+   },
+   "N02-5": {
+    "label": "야외 데크",
+    "type": "room",
+    "board": ""
+   },
+   "N04-3": {
+    "label": "화장실-3",
+    "type": "toilet",
+    "board": ""
+   },
+   "N03-5": {
+    "label": "계단실-5",
+    "type": "stair",
+    "board": ""
+   },
+   "144-1": {
+    "label": "조리실",
+    "type": "util",
+    "board": ""
+   },
+   "C1-7": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "N01-2": {
+    "label": "중앙현관",
+    "type": "hall",
+    "board": ""
+   },
+   "C1-8": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "101-1": {
+    "label": "문서고",
+    "type": "util",
+    "board": ""
+   },
+   "R1-1": {
+    "label": "공실",
+    "type": "room",
+    "board": ""
+   },
+   "N03-6": {
+    "label": "계단실-6",
+    "type": "stair",
+    "board": ""
+   },
+   "C1-9": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   }
+  },
+  "2F": {
+   "201": {
+    "label": "교무행정센터(본부교무실)",
+    "type": "office",
+    "board": ""
+   },
+   "202": {
+    "label": "사회교과실",
+    "type": "class",
+    "board": "S"
+   },
+   "203": {
+    "label": "국어교과실1",
+    "type": "class",
+    "board": "E"
+   },
+   "204": {
+    "label": "1학년 정독실",
+    "type": "room",
+    "board": ""
+   },
+   "205": {
+    "label": "다인교과실1",
+    "type": "class",
+    "board": "E"
+   },
+   "207": {
+    "label": "1학년 회의실",
+    "type": "office",
+    "board": ""
+   },
+   "208": {
+    "label": "1학년 홈베이스",
+    "type": "homebase",
+    "board": ""
+   },
+   "209": {
+    "label": "1학년 교무실",
+    "type": "office",
+    "board": ""
+   },
+   "210": {
+    "label": "1학년 6반",
+    "type": "class",
+    "board": "E"
+   },
+   "211": {
+    "label": "1학년 5반",
+    "type": "class",
+    "board": "E"
+   },
+   "212": {
+    "label": "1학년 4반",
+    "type": "class",
+    "board": "E"
+   },
+   "215": {
+    "label": "수학교과실1",
+    "type": "class",
+    "board": "N"
+   },
+   "216": {
+    "label": "미디어 스페이스",
+    "type": "lounge",
+    "board": ""
+   },
+   "217": {
+    "label": "수학교과실2",
+    "type": "class",
+    "board": "W"
+   },
+   "218": {
+    "label": "1학년 3반",
+    "type": "class",
+    "board": "W"
+   },
+   "219": {
+    "label": "1학년 2반",
+    "type": "class",
+    "board": "W"
+   },
+   "220": {
+    "label": "1학년 1반",
+    "type": "class",
+    "board": "W"
+   },
+   "221": {
+    "label": "회의실",
+    "type": "office",
+    "board": ""
+   },
+   "224": {
+    "label": "전산실",
+    "type": "office",
+    "board": ""
+   },
+   "225": {
+    "label": "여교사휴게실",
+    "type": "office",
+    "board": ""
+   },
+   "226": {
+    "label": "남교사휴게실",
+    "type": "office",
+    "board": ""
+   },
+   "227": {
+    "label": "교감실",
+    "type": "office",
+    "board": ""
+   },
+   "228": {
+    "label": "성적처리실",
+    "type": "office",
+    "board": ""
+   },
+   "229": {
+    "label": "체력단련실",
+    "type": "room",
+    "board": ""
+   },
+   "231": {
+    "label": "강당",
+    "type": "gym",
+    "board": ""
+   },
+   "234": {
+    "label": "남샤워실",
+    "type": "toilet",
+    "board": ""
+   },
+   "235": {
+    "label": "여샤워실",
+    "type": "toilet",
+    "board": ""
+   },
+   "237": {
+    "label": "체육활동실",
+    "type": "room",
+    "board": ""
+   },
+   "238": {
+    "label": "1학년 7반",
+    "type": "class",
+    "board": "E"
+   },
+   "239": {
+    "label": "1학년 8반",
+    "type": "class",
+    "board": "E"
+   },
+   "240": {
+    "label": "교과실",
+    "type": "class",
+    "board": "E"
+   },
+   "241": {
+    "label": "준비실",
+    "type": "util",
+    "board": ""
+   },
+   "243": {
+    "label": "인공지능실",
+    "type": "lab",
+    "board": ""
+   },
+   "244": {
+    "label": "영어교과실",
+    "type": "class",
+    "board": "E"
+   },
+   "N03-1": {
+    "label": "계단실-1",
+    "type": "stair",
+    "board": ""
+   },
+   "N04-1": {
+    "label": "화장실-1",
+    "type": "toilet",
+    "board": ""
+   },
+   "N05-2": {
+    "label": "사물함",
+    "type": "homebase",
+    "board": ""
+   },
+   "C2-1": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C2-2": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "V2-1": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "C2-3": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C2-4": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "U2-1": {
+    "label": "TPS·TS·승강기",
+    "type": "util",
+    "board": ""
+   },
+   "N03-4": {
+    "label": "계단실-4",
+    "type": "stair",
+    "board": ""
+   },
+   "N03-g": {
+    "label": "중앙 계단",
+    "type": "stair",
+    "board": ""
+   },
+   "V2-2": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "C2-5": {
+    "label": "연결 복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C2-6": {
+    "label": "연결 복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "V2-3": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "V2-4": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "N03-2": {
+    "label": "계단실-2",
+    "type": "stair",
+    "board": ""
+   },
+   "N04-2": {
+    "label": "화장실-2",
+    "type": "toilet",
+    "board": ""
+   },
+   "C2-7": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "V2-5": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "C2-8": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C2-9": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "N03-3": {
+    "label": "계단실-3",
+    "type": "stair",
+    "board": ""
+   },
+   "N04-3": {
+    "label": "화장실-3",
+    "type": "toilet",
+    "board": ""
+   },
+   "N03-5": {
+    "label": "계단실-5",
+    "type": "stair",
+    "board": ""
+   },
+   "C2-10": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "231-1": {
+    "label": "체육교사실",
+    "type": "office",
+    "board": ""
+   },
+   "231-2": {
+    "label": "무대",
+    "type": "stage",
+    "board": ""
+   },
+   "231-3": {
+    "label": "방송장비실·기구창고",
+    "type": "util",
+    "board": ""
+   },
+   "C2-11": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "H2-2": {
+    "label": "홀",
+    "type": "hall",
+    "board": ""
+   },
+   "N02-3": {
+    "label": "방풍실-3",
+    "type": "room",
+    "board": ""
+   },
+   "C2-12": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "201-1": {
+    "label": "교무센터 물품보관소",
+    "type": "util",
+    "board": ""
+   },
+   "C2-13": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "N03-6": {
+    "label": "계단실-6",
+    "type": "stair",
+    "board": ""
+   },
+   "V2-6": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "C2-14": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   }
+  },
+  "3F": {
+   "301": {
+    "label": "선택교과실1",
+    "type": "class",
+    "board": "E"
+   },
+   "302": {
+    "label": "책상창고",
+    "type": "util",
+    "board": ""
+   },
+   "303": {
+    "label": "선택교과실2",
+    "type": "class",
+    "board": "E"
+   },
+   "304": {
+    "label": "선택교과실3",
+    "type": "class",
+    "board": "E"
+   },
+   "305": {
+    "label": "2학년 정독실",
+    "type": "room",
+    "board": ""
+   },
+   "306": {
+    "label": "2학년 회의실",
+    "type": "office",
+    "board": ""
+   },
+   "308": {
+    "label": "2학년 홈베이스",
+    "type": "homebase",
+    "board": ""
+   },
+   "309": {
+    "label": "2학년 교무실",
+    "type": "office",
+    "board": ""
+   },
+   "310": {
+    "label": "2학년 7반",
+    "type": "class",
+    "board": "E"
+   },
+   "311": {
+    "label": "2학년 6반",
+    "type": "class",
+    "board": "E"
+   },
+   "312": {
+    "label": "2학년 5반",
+    "type": "class",
+    "board": "E"
+   },
+   "313": {
+    "label": "미디어 스페이스",
+    "type": "lounge",
+    "board": ""
+   },
+   "315": {
+    "label": "국어교과실2",
+    "type": "class",
+    "board": "N"
+   },
+   "316": {
+    "label": "2학년 4반",
+    "type": "class",
+    "board": "W"
+   },
+   "317": {
+    "label": "2학년 3반",
+    "type": "class",
+    "board": "W"
+   },
+   "318": {
+    "label": "2학년 2반",
+    "type": "class",
+    "board": "W"
+   },
+   "319": {
+    "label": "2학년 1반",
+    "type": "class",
+    "board": "W"
+   },
+   "320": {
+    "label": "진로활동실1",
+    "type": "room",
+    "board": ""
+   },
+   "321": {
+    "label": "진로활동실2",
+    "type": "room",
+    "board": ""
+   },
+   "322": {
+    "label": "컴퓨터실",
+    "type": "lab",
+    "board": ""
+   },
+   "323": {
+    "label": "사회교과실",
+    "type": "class",
+    "board": "S"
+   },
+   "324": {
+    "label": "다인교과실3",
+    "type": "class",
+    "board": "S"
+   },
+   "327": {
+    "label": "부속실1",
+    "type": "room",
+    "board": ""
+   },
+   "328": {
+    "label": "부속실2",
+    "type": "room",
+    "board": ""
+   },
+   "329": {
+    "label": "음악실",
+    "type": "room",
+    "board": ""
+   },
+   "330": {
+    "label": "시청각실",
+    "type": "room",
+    "board": ""
+   },
+   "332": {
+    "label": "학생회실",
+    "type": "office",
+    "board": ""
+   },
+   "333": {
+    "label": "동아리실1",
+    "type": "room",
+    "board": ""
+   },
+   "334": {
+    "label": "동아리실2",
+    "type": "room",
+    "board": ""
+   },
+   "336": {
+    "label": "모두서원(도서실)",
+    "type": "room",
+    "board": ""
+   },
+   "337": {
+    "label": "2학년 8반",
+    "type": "class",
+    "board": "E"
+   },
+   "338": {
+    "label": "2학년 9반",
+    "type": "class",
+    "board": "E"
+   },
+   "339": {
+    "label": "다인교과실2",
+    "type": "class",
+    "board": "E"
+   },
+   "N03-1": {
+    "label": "계단실-1",
+    "type": "stair",
+    "board": ""
+   },
+   "N04-1": {
+    "label": "화장실-1",
+    "type": "toilet",
+    "board": ""
+   },
+   "N05-3": {
+    "label": "사물함",
+    "type": "homebase",
+    "board": ""
+   },
+   "C3-1": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C3-2": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "V3-1": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "C3-3": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "U3-1": {
+    "label": "TPS·TS·승강기",
+    "type": "util",
+    "board": ""
+   },
+   "N03-4": {
+    "label": "계단실-4",
+    "type": "stair",
+    "board": ""
+   },
+   "N03-2": {
+    "label": "계단실-2",
+    "type": "stair",
+    "board": ""
+   },
+   "N04-2": {
+    "label": "화장실-2",
+    "type": "toilet",
+    "board": ""
+   },
+   "C3-4": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "V3-2": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "C3-5": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C3-6": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "N03-3": {
+    "label": "계단실-3",
+    "type": "stair",
+    "board": ""
+   },
+   "V3-3": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "C3-7": {
+    "label": "연결 복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "N04-3": {
+    "label": "화장실-3",
+    "type": "toilet",
+    "board": ""
+   },
+   "N03-5": {
+    "label": "계단실-5",
+    "type": "stair",
+    "board": ""
+   },
+   "C3-8": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "V3-4": {
+    "label": "강당 상부",
+    "type": "void",
+    "board": ""
+   },
+   "V3-5": {
+    "label": "무대·준비실 상부",
+    "type": "void",
+    "board": ""
+   },
+   "C3-9": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C3-10": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "N03-6": {
+    "label": "계단실-6",
+    "type": "stair",
+    "board": ""
+   }
+  },
+  "4F": {
+   "401": {
+    "label": "3학년 8반",
+    "type": "class",
+    "board": "E"
+   },
+   "402": {
+    "label": "3학년 7반",
+    "type": "class",
+    "board": "E"
+   },
+   "403": {
+    "label": "3학년 정독실",
+    "type": "room",
+    "board": ""
+   },
+   "404": {
+    "label": "3학년 6반",
+    "type": "class",
+    "board": "E"
+   },
+   "406": {
+    "label": "3학년 회의실",
+    "type": "office",
+    "board": ""
+   },
+   "407": {
+    "label": "진학상담실",
+    "type": "office",
+    "board": ""
+   },
+   "408": {
+    "label": "3학년 5반",
+    "type": "class",
+    "board": "W"
+   },
+   "409": {
+    "label": "3학년 교무실",
+    "type": "office",
+    "board": ""
+   },
+   "410": {
+    "label": "3학년 4반",
+    "type": "class",
+    "board": "W"
+   },
+   "411": {
+    "label": "3학년 3반",
+    "type": "class",
+    "board": "E"
+   },
+   "412": {
+    "label": "3학년 2반",
+    "type": "class",
+    "board": "E"
+   },
+   "413": {
+    "label": "3학년 1반",
+    "type": "class",
+    "board": "E"
+   },
+   "414": {
+    "label": "3학년 홈베이스",
+    "type": "room",
+    "board": ""
+   },
+   "N03-1": {
+    "label": "계단실-1",
+    "type": "stair",
+    "board": ""
+   },
+   "N04-1": {
+    "label": "화장실-1",
+    "type": "toilet",
+    "board": ""
+   },
+   "C4-1": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C4-2": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "V4-1": {
+    "label": "오픈",
+    "type": "void",
+    "board": ""
+   },
+   "C4-3": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "C4-4": {
+    "label": "복도",
+    "type": "corridor",
+    "board": ""
+   },
+   "U4-1": {
+    "label": "TPS·TS·승강기",
+    "type": "util",
+    "board": ""
+   },
+   "N03-4": {
+    "label": "계단실-4",
+    "type": "stair",
+    "board": ""
+   }
+  }
+ }
+}</script>
+
+<script>
+(() => {
+'use strict';
+const PLAN = JSON.parse(document.getElementById('plan-data').textContent);
+const LB = JSON.parse(document.getElementById('labels').textContent);
+LB.meta = Object.assign({
+  school: 'BANGOK HIGH SCHOOL', title: '반곡고등학교 층별 배치도',
+  note: '',   // 아래 줄 글(비우면 안 보임). 2019 설계도 문구는 사용자 요청으로 뺌(2026-10-20)
+  date: '2026학년도', school2: '반곡고등학교', paper: 'A3', showNum: true, furniture: true,
+  subs: {
+    '1F': '과학·기술·미술실 / 행정실·교장실·보건실 / 식생활교육관',
+    '2F': '1학년 교실 / 교과교실 / 강당 / 교무행정센터',
+    '3F': '2학년 교실 · 3학년 7~9반 / 도서실·시청각실·음악실',
+    '4F': '3학년 1~6반 / 선택교과실 / 진학상담실',
+  },
+}, LB.meta || {});
+LB.rooms = LB.rooms || {};
+LB.meta.around = Object.assign({ N: '한누리대로', E: '시청대로', S: '주차장', W: '괴화산' }, LB.meta.around || {});
+LB.meta.view = LB.meta.view || 'all';
+LB.meta.turn = ((LB.meta.turn | 0) % 4 + 4) % 4;
+if (LB.meta.context === undefined) LB.meta.context = true;
+delete LB.meta.facing;
+LB.meta.stairCheck = !!LB.meta.stairCheck;   // 계단 확인: 평소엔 끔(입구를 다시 짚을 때 단추로 켠다)
+LB.sets = LB.sets || [];        // 라벨 세트(예: 수능 시험장): { name, rooms, meta } — 기본 위에 바꾼 것만 덮는다
+LB.active = LB.active || '';    // '' = 기본
+const FLOORS = ['1F', '2F', '3F', '4F'];
+const activeSet = () => LB.sets.find((x) => x.name === LB.active) || null;
+/* 제목·연도·층 설명: 세트에서 따로 정했으면 그것, 아니면 기본 */
+const metaVal = (k) => activeSet()?.meta?.[k] ?? LB.meta[k];
+const subVal = (f) => activeSet()?.meta?.subs?.[f] ?? LB.meta.subs[f];
+
+/* 공간 DB(학년 마을 village_rooms): 관리자가 공간 표에서 정한 방 라벨·종류·칠판 쪽. 열 때마다 새로 받고, 저장한 HTML에도 받은 것을 담아 둔다.
+   이름 순서: 지도 파일 < 공간 DB < 기본 세트에서 고친 것(LB.rooms) < 고른 라벨 세트에서 고친 것 */
+const SERVER = {"url":"https://zoegeublggdrvhafjtjr.supabase.co","key":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpvZWdldWJsZ2dkcnZoYWZqdGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMDE3NDcsImV4cCI6MjA5ODg3Nzc0N30.KShaX1wcY_0B4YWBMzVdb6Vyqk76UVPMmXx2j0sOBEE"};
+const BASE = JSON.parse(JSON.stringify(PLAN.floors));
+const DB_TYPES = new Set(['class', 'room', 'lab', 'office', 'lounge', 'util', 'toilet', 'hall', 'homebase']);
+function applyDb() {
+  for (const f of Object.keys(BASE)) PLAN.floors[f].rooms = BASE[f].rooms.map((row) => {
+    const r = LB.db?.[f]?.[row[0]]; if (!r) return row;
+    const [id, name, type, x0, x1, y0, y1, ex] = row, o = { ...ex };
+    if (r.board === 'none') delete o.board; else if (['N', 'E', 'S', 'W'].includes(r.board)) o.board = r.board;
+    const label = !r.label ? name : o.gender && !/[남여]/.test(r.label) ? (o.gender === 'm' ? '남자' : '여자') + r.label : r.label;   // 마을과 같게: 성별 정한 화장실은 앞에 남자·여자
+    return [id, label, DB_TYPES.has(type) && DB_TYPES.has(r.type) ? r.type : type, x0, x1, y0, y1, o];
+  });
+}
+const setDbNote = (t) => { document.getElementById('dbNote').textContent = t; };
+async function loadDb() {
+  if (!SERVER) return;
+  setDbNote('공간 DB 받는 중…');
+  try {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 5000);
+    const got = await Promise.all(FLOORS.map(async (f) => {
+      const res = await fetch(SERVER.url + '/rest/v1/rpc/village_get_rooms', { method: 'POST', signal: ctl.signal,
+        headers: { apikey: SERVER.key, Authorization: 'Bearer ' + SERVER.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_floor: f }) });
+      const d = res.ok ? await res.json() : null;
+      if (!d || !d.ok || !Array.isArray(d.rooms)) throw new Error('bad');
+      return [f, d.rooms];
+    }));
+    clearTimeout(timer);
+    const db = {}; let n = 0;
+    for (const [f, rows] of got) { db[f] = {}; for (const r of rows) { db[f][r.id] = { label: r.label || '', type: r.type || '', board: r.board || '' }; n++; } }
+    const changed = JSON.stringify(db) !== JSON.stringify(LB.db || {});
+    LB.db = db; LB.meta.dbAt = new Date().toLocaleDateString('ko-KR');
+    if (changed) { applyDb(); renderAll(); if (document.body.classList.contains('editing')) buildPanel(); }
+    setDbNote(`공간 DB 라벨 ${n}곳 반영`);
+  } catch (e) {
+    setDbNote(LB.db ? `공간 DB 연결 안 됨 · ${LB.meta.dbAt || ''} 받아 둔 라벨` : '공간 DB 연결 안 됨 · 지도 파일 이름');
+  }
+}
+
+/* ---------- 분류(색) ---------- */
+const CATS = {
+  g1: ['1학년 교실', '#f6c6a0'], g2: ['2학년 교실', '#b5d4ee'], g3: ['3학년 교실', '#bfe0b0'],
+  subj: ['교과교실', '#f3e19c'], lab: ['실험·실습실', '#d6c7ec'], spec: ['특별실', '#f1c3cf'],
+  student: ['학생 공간', '#fbecd2'], admin: ['교무·행정', '#d7d2c7'], gym: ['체육·강당', '#e3cb9f'],
+  wc: ['화장실', '#cbe0e5'], stair: ['계단', '#f6b27a'], lift: ['승강기', '#a9c3dc'], store: ['준비실·창고', '#ebe7df'],
+  hall: ['복도·홀', '#f5f3ee'], void: ['뚫림(오픈·중정)', '#34373c'],
+};
+const LEGEND_SKIP = new Set(['hall']);
+
+/* 지도 이름 → 기본 라벨. 해마다 고칠 것은 라벨 편집에서 덮어쓴다 */
+function defaultLabel(r) {
+  const [id, name, type] = r;
+  let n = name, cat = 'spec', hide = false;
+  const g = /^([123])학년 \d+반$/.exec(name);
+  if (type === 'class') cat = g ? 'g' + g[1] : 'subj';
+  else if (type === 'lab') cat = 'lab';
+  else if (type === 'office') cat = 'admin';
+  else if (type === 'room') cat = /정독실|자습|동아리|학생회|홈베이스|미디어|방풍실/.test(name) ? 'student' : 'spec';
+  else if (type === 'homebase' || type === 'lounge') cat = 'student';
+  else if (type === 'gym' || type === 'stage') cat = 'gym';
+  else if (type === 'toilet') { cat = 'wc'; n = name.replace(/^(여|남)자화장실.*$/, '$1 화장실').replace(/-\d+$/, ''); }
+  else if (type === 'stair') { cat = 'stair'; n = /중앙/.test(name) ? '중앙계단' : '계단'; }
+  else if (type === 'util') { if (/승강기/.test(name)) { cat = 'lift'; n = '승강기'; } else cat = 'store'; }
+  else if (type === 'corridor') { cat = 'hall'; hide = true; }
+  else if (type === 'hall') cat = 'hall';
+  else if (type === 'void') { cat = 'void'; hide = name === '오픈'; }
+  else if (type === 'court') cat = 'void';
+  if (type === 'room' || type === 'hall') n = n.replace(/-\d+$/, '');
+  n = n.replace(/^미디어 스페이스\(과학과 전시물\)$/, '미디어 스페이스/(과학 전시)');
+  return { name: n, cat, hide };
+}
+const baseLabel = (f, r) => Object.assign(defaultLabel(r), isEntrance(f, r[0]) ? { hide: true } : {}, LB.rooms[f]?.[r[0]] || {});               // 기본 세트
+/* 건물 입구(2026-10-20 사용자): 바깥에서 들어오는 현관 칸. 방 이름 대신 바깥에 '입구' 화살표를 그린다 */
+const ENTRANCES = { '1F': ['N02-2', 'N02-1'], '2F': ['N02-3'] };   // 2층 방풍실-3: 남쪽(주차장) 바깥에서 들어옴
+const isEntrance = (f, id) => (ENTRANCES[f] || []).includes(id);
+const labelOf = (f, r) => Object.assign(baseLabel(f, r), activeSet()?.rooms?.[f]?.[r[0]] || {});        // 고른 세트
+
+/* ---------- 투영 ---------- */
+const C = Math.cos(Math.PI / 6), S = 0.5;
+/* 보는 방향(2026-10-20 사용자): 평면을 원점 둘레로 ROT만큼 돌린 뒤 등각으로 그린다. 그림 위쪽 = 바라보는 쪽.
+   아이소(기본)는 ROT 0(남동쪽에서 북서쪽을 봄). 화면 위쪽은 돌린 평면의 (-1,-1) 방향 */
+let RC = 1, RS = 0, VX = Math.SQRT1_2, VY = Math.SQRT1_2;   // 회전 cos·sin, 보는 사람 쪽(평면, 단위벡터)
+const rot = (x, y) => [x * RC - y * RS, x * RS + y * RC];
+const pt = (x, y, z = 0) => { const [a, b] = rot(x, y); return [(a - b) * C, (a + b) * S - z]; };
+const depthOf = (x, y) => { const [a, b] = rot(x, y); return a + b; };   // 클수록 보는 사람에 가깝다
+/* 회전(2026-10-20 사용자): 기본은 아이소, ⟲⟳ 단추로 90도씩(LB.meta.turn). 현재 위치를 찍으면 바라보는 쪽이 위로 오게 놓고 그 위에서 다시 90도씩 */
+function setFacing() {
+  const m = LB.meta, f = m.here ? [Math.cos(m.here.a), Math.sin(m.here.a)] : null;
+  const th = (f ? Math.atan2(-1, -1) - Math.atan2(f[1], f[0]) : 0) + (m.turn || 0) * Math.PI / 2;
+  RC = Math.cos(th); RS = Math.sin(th);
+  VX = (Math.SQRT1_2) * (RC + RS); VY = (Math.SQRT1_2) * (RC - RS);   // (1,1)/√2를 거꾸로 돌린 것
+  VIEW = null; for (const k of Object.keys(VIEWS)) delete VIEWS[k];
+}
+const unPt = (u, v) => {   // 그림 좌표 → 바닥(z=0) 평면 좌표
+  const a = (u / C + v / S) / 2, b = (v / S - u / C) / 2;
+  return [a * RC + b * RS, -a * RS + b * RC];
+};
+const ps = (a) => a.map(([u, v]) => u.toFixed(2) + ',' + v.toFixed(2)).join(' ');
+const WALL_H = 1.35, SLAB = 0.9, T_EXT = 0.42, T_IN = 0.2, RAIL_H = 1.0, RAIL_T = 0.06;
+const OPEN = new Set(['corridor', 'hall', 'homebase']);
+const COL = { top: '#2c2f34', south: '#d9d4ca', east: '#c3bdb1', slabS: '#bdb7ab', slabE: '#a8a296',
+  rail: '#9fc3d6', railTop: '#6f97ad', door: '#8a8578', board: '#3c6a55', desk: 'rgba(60,50,30,.16)', stairLine: 'rgba(120,52,12,.6)' };
+
+/* 한 층을 칸(모든 방 경계로 자른 격자)으로 나눈다. own[칸] = 그 칸을 차지한 방(나중 줄이 앞 줄을 덮음) */
+function analyze(f) {
+  const rooms = PLAN.floors[f].rooms;
+  const uniq = (a) => [...new Set(a)].sort((p, q) => p - q);
+  const xs = uniq(rooms.flatMap((r) => [r[3], r[4]])), ys = uniq(rooms.flatMap((r) => [r[5], r[6]]));
+  const nx = xs.length - 1, ny = ys.length - 1, own = new Int16Array(nx * ny).fill(-1);
+  const ix = new Map(xs.map((v, i) => [v, i])), iy = new Map(ys.map((v, i) => [v, i]));
+  rooms.forEach((r, k) => {
+    for (let j = iy.get(r[5]); j < iy.get(r[6]); j++) for (let i = ix.get(r[3]); i < ix.get(r[4]); i++) own[j * nx + i] = k;
+  });
+  const at = (i, j) => (i < 0 || j < 0 || i >= nx || j >= ny ? -1 : own[j * nx + i]);
+  const cellAt = (x, y) => { let i = xs.findIndex((v) => v > x) - 1, j = ys.findIndex((v) => v > y) - 1; return i < 0 || j < 0 ? -1 : at(i, j); };
+  // 계단실(벽으로 둘러싼 계단)은 닫힌 방, 가운데 계단은 난간
+  const kind = (k) => { if (k < 0) return 'out'; const r = rooms[k]; return r[2] === 'stair' && (/계단실/.test(r[1]) || r[7].walled) ? 'stairroom' : r[2]; };
+  return { f, rooms, xs, ys, nx, ny, at, cellAt, kind };
+}
+
+/* 두 칸 사이에 무엇이 서나: null(트임) · wall · ext(바깥벽) · rail(난간) */
+function edgeKind(A, a, b) {
+  if (a === b) return null;
+  if (a >= 0 && b >= 0 && A.rooms[a][0] === A.rooms[b][0]) return null;
+  const ta = A.kind(a), tb = A.kind(b);
+  const outish = (t) => t === 'out' || t === 'court';
+  if (outish(ta) && outish(tb)) return null;
+  if (outish(ta) || outish(tb)) return (outish(ta) ? tb : ta) === 'void' ? 'rail' : 'ext';
+  if (ta === 'void' && tb === 'void') return null;
+  const oa = OPEN.has(ta), ob = OPEN.has(tb);
+  if (oa && ob) return null;
+  if ((ta === 'void' && (ob || tb === 'stair')) || (tb === 'void' && (oa || ta === 'stair'))) return 'rail';
+  if ((ta === 'stair' && ob) || (tb === 'stair' && oa)) return null;   // 중앙계단은 홀에 열려 있다(난간은 뚫린 곳 둘레에만)
+  if ((ta === 'gym' && tb === 'stage') || (ta === 'stage' && tb === 'gym')) return null;
+  return 'wall';
+}
+
+/* 같은 줄에서 이어지고 종류·양쪽 방이 같은 변을 묶어 벽 줄로 */
+function edgeRuns(A, kindFn) {
+  const { xs, ys, nx, ny, at } = A, out = [];
+  for (let j = 0; j <= ny; j++) {
+    let cur = null;
+    for (let i = 0; i < nx; i++) {
+      const a = at(i, j - 1), b = at(i, j), k = kindFn(a, b);
+      if (cur && k === cur.kind && cur.na === a && cur.nb === b) { cur.b = xs[i + 1]; continue; }
+      cur = k ? { ax: 'h', at: ys[j], a: xs[i], b: xs[i + 1], kind: k, na: a, nb: b } : null;
+      if (cur) out.push(cur);
+    }
+  }
+  for (let i = 0; i <= nx; i++) {
+    let cur = null;
+    for (let j = 0; j < ny; j++) {
+      const a = at(i - 1, j), b = at(i, j), k = kindFn(a, b);
+      if (cur && k === cur.kind && cur.na === a && cur.nb === b) { cur.b = ys[j + 1]; continue; }
+      cur = k ? { ax: 'v', at: xs[i], a: ys[j], b: ys[j + 1], kind: k, na: a, nb: b } : null;
+      if (cur) out.push(cur);
+    }
+  }
+  return out;
+}
+
+/* 문: 도면 문 목록 + 지도에 입구(entry)를 정한 계단실의 입구 */
+function doorsOf(A, runs) {
+  const list = PLAN.floors[A.f].doors.map(([ax, at, a, b, open, hinge]) => ({ ax, at, a: Math.min(a, b), b: Math.max(a, b), open, hinge }));
+  const onRun = (d, r) => r.ax === d.ax && Math.abs(r.at - d.at) < 0.2 && d.a < r.b - 0.05 && d.b > r.a + 0.05 && r.kind !== 'rail';
+  const has = new Set();
+  for (const d of list) for (const r of runs) if (onRun(d, r)) { d.hit = true; if (r.na >= 0) has.add(A.rooms[r.na][0]); if (r.nb >= 0) has.add(A.rooms[r.nb][0]); }
+  // 문은 도면 문 목록에 있는 것만 그린다. 목록에 없는 방에 문을 지어내지 않는다(2026-10-20 사용자)
+  // 도면에 입구를 정한 계단실: 그 변 가운데가 막혀 있으면 문을 하나 낸다(1.2m)
+  A.rooms.forEach((r, k) => {
+    const e = r[7].entry; if (!e || A.kind(k) !== 'stairroom') return;
+    const h = e === 'N' || e === 'S', at = { N: r[5], S: r[6], W: r[3], E: r[4] }[e], mid = h ? (r[3] + r[4]) / 2 : (r[5] + r[6]) / 2;
+    if (list.some((d) => d.hit && d.ax === (h ? 'h' : 'v') && Math.abs(d.at - at) < 0.2 && d.a < mid + 0.6 && d.b > mid - 0.6)) return;
+    list.push({ ax: h ? 'h' : 'v', at, a: mid - 0.6, b: mid + 0.6, open: e === 'N' || e === 'W' ? (h ? 'S' : 'E') : (h ? 'N' : 'W'), hinge: 'a', hit: true });
+  });
+  return list.filter((d) => d.hit);
+}
+
+/* 벽 줄에서 문 자리를 뺀 조각들 */
+function cutDoors(r, doors) {
+  let parts = [[r.a, r.b]];
+  for (const d of doors) {
+    if (d.ax !== r.ax || Math.abs(d.at - r.at) > 0.2) continue;
+    parts = parts.flatMap(([p, q]) => (d.b <= p || d.a >= q ? [[p, q]] : [[p, d.a], [d.b, q]].filter(([u, v]) => v - u > 0.05)));
+  }
+  return parts;
+}
+
+/* ---------- 그리기 ---------- */
+const el = (tag, attrs, inner = '') => `<${tag} ${Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ')}>${inner}</${tag}>`;
+const poly = (pts, fill, extra = '') => `<polygon points="${ps(pts)}" fill="${fill}" ${extra}/>`;
+const quadFloor = (x0, x1, y0, y1, z = 0) => [pt(x0, y0, z), pt(x1, y0, z), pt(x1, y1, z), pt(x0, y1, z)];
+
+const faceSeen = (nx, ny) => nx * VX + ny * VY > 0.02;   // 바깥 방향이 (nx,ny)인 면이 보이나
+function boxFaces(x0, x1, y0, y1, z0, z1, cs, ce, ct) {
+  const f = (a, b, col) => poly([pt(...a, z0), pt(...b, z0), pt(...b, z1), pt(...a, z1)], col);
+  let sides = '';
+  if (faceSeen(0, 1)) sides += f([x0, y1], [x1, y1], cs);
+  if (faceSeen(0, -1)) sides += f([x0, y0], [x1, y0], cs);
+  if (faceSeen(1, 0)) sides += f([x1, y0], [x1, y1], ce);
+  if (faceSeen(-1, 0)) sides += f([x0, y0], [x0, y1], ce);
+  return { key: depthOf((x0 + x1) / 2, (y0 + y1) / 2), sides, top: poly(quadFloor(x0, x1, y0, y1, z1), ct, `stroke="${ct}" stroke-width="0.04"`) };
+}
+
+/* 입구 화살표: 현관 칸에서 바깥과 맞닿은 변을 찾아, 바깥에서 그 변으로 들어오는 납작한 화살표(바닥 위)와 '입구' */
+function entranceSide(A, r) {
+  const cx = (r[3] + r[4]) / 2, cy = (r[5] + r[6]) / 2, out = (x, y) => { const k = A.cellAt(x, y); return k < 0 || A.kind(k) === 'court'; };
+  const sides = [[0, 1, cx, r[6]], [1, 0, r[4], cy], [0, -1, cx, r[5]], [-1, 0, r[3], cy]];   // 남·동·북·서: 바깥 방향과 변 가운데
+  // 현관은 홀·복도와 맞닿은 변의 맞은편으로 들어온다. 그런 변이 없으면 바깥과 맞닿은 첫 변
+  const inner = (x, y) => { const k = A.cellAt(x, y); return k >= 0 && OPEN.has(A.kind(k)); };
+  const back = sides.find(([dx, dy, x, y]) => inner(x + dx * 0.3, y + dy * 0.3));
+  if (back) { const opp = sides.find(([dx, dy]) => dx === -back[0] && dy === -back[1]); if (out(opp[2] + opp[0] * 0.3, opp[3] + opp[1] * 0.3)) return opp; }
+  return sides.find(([dx, dy, x, y]) => out(x + dx * 0.3, y + dy * 0.3)) || null;
+}
+function entranceSvg(A) {
+  return A.rooms.filter((r) => isEntrance(A.f, r[0])).map((r) => {
+    const side = entranceSide(A, r); if (!side) return '';
+    const [ox, oy, ex, ey] = side, nx = -oy, ny = ox;              // o: 바깥쪽, n: 옆
+    const P = (along, sidew) => pt(ex + ox * along + nx * sidew, ey + oy * along + ny * sidew, 0.02);
+    const tail = 4.4, neck = 1.9, tip = 0.45, sw = 0.42, hw = 1.15;
+    const arrow = [P(tail, -sw), P(neck, -sw), P(neck, -hw), P(tip, 0), P(neck, hw), P(neck, sw), P(tail, sw)];
+    const Q = (along, side) => pt(ex + ox * along + nx * side, ey + oy * along + ny * side, 0);
+    const word = A.f === '1F' ? '입구' : `${A.f[0]}층 입구`;   // 2층 입구는 1층 입구와 헷갈리지 않게(2026-10-20 사용자)
+    const [u, v] = placeText([Q(tail + 1.9, 0), Q(tail + 0.6, 2.6), Q(tail + 0.6, -2.6), Q(tail + 3.2, 0)], textW(word) * 1.7, 1.9);
+    return poly(arrow, '#c0392b', 'stroke="#fff" stroke-width="0.12"')
+      + `<text class="nm" x="${u.toFixed(2)}" y="${v.toFixed(2)}" font-size="1.7" stroke-width="0.45" style="fill:#c0392b">${word}</text>`;
+  }).join('');
+}
+
+/* 주변 정보 자리: 그 층 건물 네 변(맨 바깥 방들) 가운데에서 바깥으로 7m */
+const AROUND_GAP = 7, AROUND_DIR = { N: ['북', 'x'], E: ['동', 'y'], S: ['남', 'x'], W: ['서', 'y'] };
+function aroundAnchors(f) {
+  const rs = PLAN.floors[f].rooms, mid = (a) => (Math.min(...a) + Math.max(...a)) / 2;
+  const x0 = Math.min(...rs.map((r) => r[3])), x1 = Math.max(...rs.map((r) => r[4])), y0 = Math.min(...rs.map((r) => r[5])), y1 = Math.max(...rs.map((r) => r[6]));
+  const at = {
+    N: [mid(rs.filter((r) => r[5] === y0).flatMap((r) => [r[3], r[4]])), y0 - AROUND_GAP],
+    S: [mid(rs.filter((r) => r[6] === y1).flatMap((r) => [r[3], r[4]])), y1 + AROUND_GAP],
+    E: [x1 + AROUND_GAP, mid(rs.filter((r) => r[4] === x1).flatMap((r) => [r[5], r[6]]))],
+    W: [x0 - AROUND_GAP, mid(rs.filter((r) => r[3] === x0).flatMap((r) => [r[5], r[6]]))],
+  };
+  // 동(정문)·남(주차장)은 1층 동쪽·남쪽 입구 앞에. 그 층에 남쪽 동이 있을 때만(4층은 변 가운데)
+  if (y1 > 60) {
+    const ent = Object.fromEntries((BASE['1F']?.rooms || []).filter((r) => isEntrance('1F', r[0])).map((r) => [r[0], r]));
+    const e = ent['N02-1'], so = ent['N02-2'];
+    if (e) { const cy = (e[5] + e[6]) / 2; at.E = [Math.max(e[4], ...rs.filter((r) => r[5] < cy + 4 && r[6] > cy - 4).map((r) => r[4])) + AROUND_GAP + 9, cy]; }
+    if (so) { const cx = (so[3] + so[4]) / 2; at.S = [cx, Math.max(so[6], ...rs.filter((r) => r[3] < cx + 6 && r[4] > cx - 6).map((r) => r[6])) + AROUND_GAP]; }
+  }
+  return at;
+}
+function aroundSvg(f) {
+  const A = aroundAnchors(f);
+  return Object.entries(AROUND_DIR).map(([k, [dir, axis]]) => {
+    const name = (LB.meta.around[k] || '').trim(); if (!name) return '';
+    const [u, v] = pt(...A[k]), [du, dv] = axis === 'x' ? pt(1, 0) : pt(0, 1);
+    let rot = Math.atan2(dv, du) * 180 / Math.PI; if (rot > 90) rot -= 180; if (rot <= -90) rot += 180;   // 글자가 거꾸로 서지 않게
+    return `<text transform="translate(${u.toFixed(2)},${v.toFixed(2)}) rotate(${rot})" font-size="2.3" stroke="#fff" stroke-width="0.5">`
+      + `<tspan font-weight="800" fill="#c0392b">${dir}</tspan><tspan fill="#9a958b"> │ </tspan><tspan font-weight="700" fill="#4b4f56">${esc(name)}</tspan></text>`;
+  }).join('');
+}
+
+let VIEW = null;   // 전체 보기: 네 층이 같은 viewBox를 써서 축척·자리가 같다. 한 층 보기는 그 층만 꽉 차게
+const VIEWS = {};
+function viewOf(floors) {
+  let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+  const add = (u, v) => { u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); };
+  for (const f of floors) {
+    for (const r of PLAN.floors[f].rooms) for (const [x, y] of [[r[3], r[5]], [r[4], r[5]], [r[4], r[6]], [r[3], r[6]]]) for (const z of [WALL_H, -SLAB - 1.5]) add(...pt(x, y, z));
+    for (const [x, y] of Object.values(aroundAnchors(f))) { const [u, v] = pt(x, y); add(u - 9, v - 4); add(u + 9, v + 4); }
+  }
+  const pad = 2.5;
+  return [u0 - pad, v0 - pad, u1 - u0 + 2 * pad, v1 - v0 + 2 * pad];
+}
+/* 그 층 그림의 viewBox: 전체는 네 층 공통, 두 층씩은 두 층 공통(축척·자리가 같게), 한 층은 그 층만 */
+function viewFor(f) {
+  const v = LB.meta.view;
+  if (v === '12' || v === '34') return VIEWS[v] = VIEWS[v] || viewOf(v === '12' ? ['1F', '2F'] : ['3F', '4F']);
+  return /^[1-4]F$/.test(v) ? (VIEWS[f] = VIEWS[f] || viewOf([f])) : VIEW;
+}
+function computeView() {
+  VIEW = viewOf(FLOORS);
+}
+
+/* 글자 자리(그림 좌표의 사각형). 방 이름을 먼저 적고, 계단 층수·입구 글자는 후보 자리 가운데 겹치지 않는 첫 곳에 놓는다 */
+let LBOX = [];
+const boxHit = (b) => LBOX.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]);
+function placeText(cands, w, h) {   // cands: 그림 좌표 [u, v] 후보(앞이 우선)
+  const box = ([u, v]) => [u - w / 2 - 0.2, v - h / 2 - 0.12, u + w / 2 + 0.2, v + h / 2 + 0.12];
+  const pick = cands.find((c) => !boxHit(box(c))) || cands[0];
+  LBOX.push(box(pick));
+  return pick;
+}
+function renderFloor(f) {
+  LBOX = [];
+  const A = analyze(f), rooms = A.rooms;
+  const runs = edgeRuns(A, (a, b) => edgeKind(A, a, b));
+  const doors = doorsOf(A, runs);
+  const furn = LB.meta.furniture;
+  const foot = (k) => k >= 0 && !['void', 'court'].includes(A.kind(k));
+  const out = [];
+
+  // 주변(맨 아래, 그림 범위 안에서만)
+  out.push(contextSvg(f, viewFor(f)));
+  // 그림자와 바닥판 옆면
+  const shadow = rooms.filter((r, k) => foot(k)).map((r) => poly(quadFloor(r[3] + VX * 1.27, r[4] + VX * 1.27, r[5] + VY * 1.27, r[6] + VY * 1.27, -SLAB), '#000')).join('');
+  out.push(`<g opacity=".13" filter="url(#blur-${f})">${shadow}</g>`);
+
+  // 오픈·중정 바닥(아래가 트인 곳)
+  rooms.forEach((r, k) => {
+    const t = A.kind(k);
+    if (t === 'void') out.push(poly(quadFloor(r[3], r[4], r[5], r[6], -SLAB), CATS.void[1]));
+  });
+  const slab = edgeRuns(A, (a, b) => (foot(a) !== foot(b) ? 'slab' : null));
+  for (const e of slab) {
+    const sg = foot(e.na) && !foot(e.nb) ? 1 : -1;   // 바닥판 바깥 방향(h: 남 +1·북 -1, v: 동 +1·서 -1)
+    if (e.ax === 'h' && faceSeen(0, sg)) out.push(poly([pt(e.a, e.at, 0), pt(e.b, e.at, 0), pt(e.b, e.at, -SLAB), pt(e.a, e.at, -SLAB)], COL.slabS));
+    if (e.ax === 'v' && faceSeen(sg, 0)) out.push(poly([pt(e.at, e.a, 0), pt(e.at, e.b, 0), pt(e.at, e.b, -SLAB), pt(e.at, e.a, -SLAB)], COL.slabE));
+  }
+
+  // 방 바닥
+  const stairRooms = [], parts = [];
+  rooms.forEach((r, k) => {
+    const t = A.kind(k); if (t === 'void') return;
+    const lb = labelOf(f, r), fill = (CATS[lb.cat] || CATS.spec)[1];
+    out.push(poly(quadFloor(r[3], r[4], r[5], r[6]), fill, `class="room" data-k="${f}|${r[0]}" stroke="rgba(0,0,0,.1)" stroke-width="0.05"`));
+    if (t === 'stair' || t === 'stairroom') stairRooms.push(r);
+    if (furn && r[2] === 'class') out.push(classFurniture(r));
+  });
+
+  // 입체 계단: 내려가는 구덩이는 여기서, 올라가는 단은 벽과 함께 순서를 정한다
+  for (const r of stairRooms) out.push(stairGeom(A, r, doors, parts));
+
+  // 문짝과 여는 호
+  if (furn) for (const d of doors) out.push(doorSwing(d));
+
+  // 벽·난간·기둥: 옆면을 뒤에서 앞으로, 윗면은 맨 나중에(같은 높이라 윗면은 늘 옆면 앞에 보인다)
+  for (const r of runs) {
+    const rail = r.kind === 'rail', t = rail ? RAIL_T : r.kind === 'ext' ? T_EXT : T_IN, h = rail ? RAIL_H : WALL_H;
+    const ext = rail ? 0 : t / 2;
+    for (const [p, q] of cutDoors({ ...r, a: r.a - ext, b: r.b + ext }, rail ? [] : doors)) {
+      for (let s = p; s < q - 1e-6; s += 1.5) {
+        const e = Math.min(q, s + 1.5);
+        const [x0, x1, y0, y1] = r.ax === 'h' ? [s, e, r.at - t / 2, r.at + t / 2] : [r.at - t / 2, r.at + t / 2, s, e];
+        parts.push(rail ? { ...boxFaces(x0, x1, y0, y1, 0, h, 'rgba(159,195,214,.45)', 'rgba(140,180,200,.5)', COL.railTop), rail: true } : boxFaces(x0, x1, y0, y1, 0, h, COL.south, COL.east, COL.top));
+      }
+    }
+  }
+  for (const [x, y] of PLAN.columns) {
+    const around = [[-0.1, -0.1], [0.1, -0.1], [-0.1, 0.1], [0.1, 0.1]].map(([a, b]) => A.kind(A.cellAt(x + a, y + b)));
+    if (around.some((t) => !OPEN.has(t) && t !== 'void' && t !== 'stair')) continue;
+    parts.push(column(x, y));
+  }
+  parts.sort((p, q) => p.key - q.key);
+  out.push(parts.map((p) => p.sides).join(''));
+  out.push(parts.map((p) => p.top).join(''));
+
+  // 라벨: 같은 번호 방은 가장 큰 조각 가운데 하나만
+  const big = new Map();
+  rooms.forEach((r) => { const a = (r[4] - r[3]) * (r[6] - r[5]), b = big.get(r[0]); if (!b || a > b.a) big.set(r[0], { r, a }); });
+  for (const { r } of big.values()) out.push(roomLabel(f, r));
+  out.push(entranceSvg(A));
+  out.push(stairEntrySvg(A, doors));
+  out.push(aroundSvg(f));
+  out.push(highlightSvg(A));
+  out.push(hereSvg(A));
+  out.push(stairCheckSvg(A, doors));
+
+  const defs = `<defs><filter id="blur-${f}" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="0.9"/></filter>
+    <pattern id="hatch-${f}" width="1.1" height="1.1" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.1" height="1.1" fill="#fbfaf7"/><line x1="0" y1="0" x2="0" y2="1.1" stroke="#d9d4ca" stroke-width="0.12"/></pattern></defs>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewFor(f).map((v) => v.toFixed(2)).join(' ')}" preserveAspectRatio="xMidYMid meet">${defs}${out.join('')}</svg>`;
+}
+
+function column(x, y) {
+  const r = 0.38, [u0, v0] = pt(x, y, 0), [, v1] = pt(x, y, WALL_H), rx = r * Math.SQRT2 * C, ry = r * Math.SQRT2 * S;
+  return {
+    key: depthOf(x, y),
+    sides: `<path d="M${(u0 - rx).toFixed(2)},${v1.toFixed(2)}V${v0.toFixed(2)}A${rx.toFixed(2)},${ry.toFixed(2)} 0 0 0 ${(u0 + rx).toFixed(2)},${v0.toFixed(2)}V${v1.toFixed(2)}Z" fill="${COL.south}"/>`,
+    top: `<ellipse cx="${u0.toFixed(2)}" cy="${v1.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="${COL.top}"/>`,
+  };
+}
+
+/* 교실: 칠판 벽과 책상 6열 5줄(바닥에 옅게) */
+function classFurniture(r) {
+  const [, , , x0, x1, y0, y1, ex] = r, side = ex.board || 'W', w = x1 - x0, h = y1 - y0;
+  let s = '';
+  // 칠판: 벽 안쪽에 초록 띠
+  const bl = 0.22, m = 0.32;
+  const bq = side === 'W' ? [x0 + m, x0 + m + bl, y0 + h * 0.2, y1 - h * 0.2] : side === 'E' ? [x1 - m - bl, x1 - m, y0 + h * 0.2, y1 - h * 0.2]
+    : side === 'N' ? [x0 + w * 0.2, x1 - w * 0.2, y0 + m, y0 + m + bl] : [x0 + w * 0.2, x1 - w * 0.2, y1 - m - bl, y1 - m];
+  s += poly(quadFloor(...bq, 0.02), COL.board);
+  // 책상: 칠판에서 앞 1.9m를 비우고 나머지에 고르게
+  const across = side === 'W' || side === 'E' ? h : w, depth = side === 'W' || side === 'E' ? w : h;
+  const cols = 6, rows = 5, front = 1.9, back = 0.7, side0 = 0.6;
+  const du = (across - 2 * side0) / cols, dv = (depth - front - back) / rows;
+  for (let c = 0; c < cols; c++) for (let k = 0; k < rows; k++) {
+    const a = side0 + du * (c + 0.5), b = front + dv * (k + 0.5), hw = 0.33, hd = 0.24;
+    let q;
+    if (side === 'W') q = [x0 + b - hd, x0 + b + hd, y0 + a - hw, y0 + a + hw];
+    else if (side === 'E') q = [x1 - b - hd, x1 - b + hd, y0 + a - hw, y0 + a + hw];
+    else if (side === 'N') q = [x0 + a - hw, x0 + a + hw, y0 + b - hd, y0 + b + hd];
+    else q = [x0 + a - hw, x0 + a + hw, y1 - b - hd, y1 - b + hd];
+    s += poly(quadFloor(...q, 0.02), COL.desk);
+  }
+  return s;
+}
+
+/* 여닫이 문: 열린 문짝 선과 1/4 원호(바닥 위). 2m 가까운 문은 양문 */
+function doorSwing(d) {
+  const L = d.b - d.a, leaves = L > 1.65 ? [['a', L / 2], ['b', L / 2]] : [[d.hinge || 'a', L]];
+  const sgn = d.open === 'S' || d.open === 'E' ? 1 : -1;
+  let s = '';
+  for (const [hg, w] of leaves) {
+    const hp = hg === 'a' ? d.a : d.b, dir = hg === 'a' ? 1 : -1;
+    const P = (along, perp) => (d.ax === 'h' ? pt(along, d.at + perp, 0.03) : pt(d.at + perp, along, 0.03));
+    const arc = [];
+    for (let i = 0; i <= 10; i++) { const t = (i / 10) * Math.PI / 2; arc.push(P(hp + dir * w * Math.cos(t), sgn * w * Math.sin(t))); }
+    s += `<polyline points="${ps(arc)}" fill="none" stroke="${COL.door}" stroke-width="0.06" stroke-dasharray="0.25 0.18"/>`;
+    s += `<polyline points="${ps([P(hp, 0), P(hp, sgn * w)])}" fill="none" stroke="${COL.door}" stroke-width="0.12"/>`;
+  }
+  return s;
+}
+
+/* 방 이름(가로 글씨, 흰 테두리). 방 안 너비에 맞춰 글씨를 줄이고, 길면 띄어쓰기에서 두 줄로 */
+const textW = (s) => [...s].reduce((w, ch) => w + (/[\u3131-\uD7A3▲▼]/.test(ch) ? 1 : /[0-9A-Za-z]/.test(ch) ? 0.58 : 0.5), 0);
+/* 입체 계단(2026-10-20 사용자: 실제 고저차가 보이게). 입구에서 시작해 긴 쪽으로 오르내린다.
+   오르기: 계단 끝까지 단을 잇고 높이는 벽 아래로 줄여 그림 · 내리기: 바닥에 뚫린 구덩이로 내려간다(구멍 모양으로 잘라 보임).
+   1층은 오르기만, 맨 위층은 내리기만, 가운데 층 계단실은 폭 반씩(꺾인 계단). 열린 중앙계단은 지도의 stair('up'|'down')를 따른다 */
+const STEP_T = 0.3, STEP_R = 0.17, STAIR_COLS = { top: '#f6b27a', s: '#d9884a', e: '#c4753a', pitWall: '#b98f6c', pitBot: '#8a6a52' };
+function stairGeom(A, r, doors, parts) {
+  const sd = stairDest(A, r), kind = r[7].stair;
+  const goUp = kind === 'down' ? false : !!sd.up, goDown = kind === 'up' ? false : !!sd.down;
+  if (!goUp && !goDown) return '';
+  const [x0, x1, y0, y1] = [r[3], r[4], r[5], r[6]];
+  // 입구를 모르면(도면에 문·entry 없음) 마을과 같이 복도·홀과 가장 길게 맞닿은 변에서 시작(화살표는 달지 않음)
+  const [ex, ey, dx, dy] = stairEntries(A, r, doors)[0] || (() => {
+    const sides = [[(x0 + x1) / 2, y0, 0, 1, 'h', y0, x0, x1, -1], [(x0 + x1) / 2, y1, 0, -1, 'h', y1, x0, x1, 1], [x0, (y0 + y1) / 2, 1, 0, 'v', x0, y0, y1, -1], [x1, (y0 + y1) / 2, -1, 0, 'v', x1, y0, y1, 1]];
+    const openLen = ([, , , , ax, at, a0, a1, out]) => { let n = 0; for (let t = a0 + 0.25; t < a1; t += 0.5) { const q = ax === 'h' ? A.cellAt(t, at + out * 0.3) : A.cellAt(at + out * 0.3, t); if (q >= 0 && OPEN.has(A.kind(q))) n++; } return n; };
+    return sides.map((sd) => [openLen(sd), sd]).sort((p, q) => q[0] - p[0])[0][1].slice(0, 4);
+  })();
+  const L = dx ? x1 - x0 : y1 - y0, W = dx ? y1 - y0 : x1 - x0, nx = -dy, ny = dx;
+  const P = (a, b) => [ex + dx * a + nx * b, ey + dy * a + ny * b];
+  const box = (a0, a1, b0, b1) => { const p = P(a0, b0), q = P(a1, b1); return [Math.min(p[0], q[0]), Math.max(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[1], q[1])]; };
+  const both = goUp && goDown, s0 = 0.02;   // 입구 바로 앞에서 첫 단(바닥에서 뜬 것처럼 보이지 않게)
+  const lanes = both ? [['up', 0.05, W / 2 - 0.02], ['down', -W / 2 + 0.02, -0.05]] : [[goUp ? 'up' : 'down', -W / 2 + 0.02, W / 2 - 0.02]];
+  let svg = '';
+  for (const [dir, b0, b1] of lanes) {
+    if (dir === 'up') {   // 계단 끝까지 단을 잇는다. 높이는 벽보다 낮게 줄여 그린다(단 수·방향은 실제대로, 2026-10-20 사용자)
+      const n = Math.max(1, Math.floor((L - s0) / STEP_T)), rise = Math.min(STEP_R, (WALL_H - 0.12) / n);
+      for (let i = 0; i < n; i++) {
+        const [bx0, bx1, by0, by1] = box(s0 + i * STEP_T, i === n - 1 ? L - 0.05 : s0 + (i + 1) * STEP_T, b0, b1);
+        const f = boxFaces(bx0, bx1, by0, by1, 0, (i + 1) * rise, STAIR_COLS.s, STAIR_COLS.e, STAIR_COLS.top);
+        parts.push({ key: f.key, sides: f.sides + f.top, top: '' });   // 단은 벽보다 낮아 윗면까지 한 번에(앞 벽이 나중에 덮는다)
+      }
+    } else {
+      // 내려가는 단: 계단 끝까지 고르게. 실제 깊이로는 좁은 구덩이 벽만 보여서 그림 깊이는 1.4m 안으로 줄인다
+      const n = Math.max(1, Math.floor((L - s0) / STEP_T)), rise = Math.min(STEP_R, (A.kind(A.rooms.indexOf(r)) === "stair" ? 2.6 : 1.4) / n), depth = n * rise, bot = -depth - 0.3;
+      const [ox0, ox1, oy0, oy1] = box(s0 - 0.05, L, b0, b1), id = `pit-${A.f}-${r[0]}-${b0 < 0 ? 'l' : 'r'}`.replace(/[^\w-]/g, '');
+      let g = poly(quadFloor(ox0, ox1, oy0, oy1, bot), STAIR_COLS.pitBot);
+      const wall = (a, b, col) => poly([pt(...a, 0), pt(...b, 0), pt(...b, bot), pt(...a, bot)], col);   // 구덩이 안쪽 벽: 안쪽 면이 보이는 먼 쪽
+      if (faceSeen(0, 1)) g += wall([ox0, oy0], [ox1, oy0], STAIR_COLS.pitWall);
+      if (faceSeen(0, -1)) g += wall([ox0, oy1], [ox1, oy1], STAIR_COLS.pitWall);
+      if (faceSeen(1, 0)) g += wall([ox0, oy0], [ox0, oy1], '#a8805f');
+      if (faceSeen(-1, 0)) g += wall([ox1, oy0], [ox1, oy1], '#a8805f');
+      const steps = [];
+      for (let i = 0; i < n; i++) {
+        const [bx0, bx1, by0, by1] = box(s0 + i * STEP_T, i === n - 1 ? L : s0 + (i + 1) * STEP_T, b0, b1);
+        steps.push(boxFaces(bx0, bx1, by0, by1, bot, -(i + 1) * rise, STAIR_COLS.s, STAIR_COLS.e, STAIR_COLS.top));
+      }
+      steps.sort((p, q) => p.key - q.key);
+      g += steps.map((q) => q.sides + q.top).join('');
+      svg += `<clipPath id="${id}"><polygon points="${ps(quadFloor(ox0, ox1, oy0, oy1, 0))}"/></clipPath><g clip-path="url(#${id})">${g}</g>`;
+      svg += `<polygon points="${ps(quadFloor(ox0, ox1, oy0, oy1, 0))}" fill="none" stroke="#7a5236" stroke-width="0.07"/>`;
+    }
+  }
+  return svg;
+}
+
+/* 계단 확인(2026-10-20 사용자): 계단마다 도면 이름(계단실-1…)과, 입구를 모르면(도면에 entry·문 없음) 빨간 '입구?' */
+function stairCheckSvg(A, doors) {
+  if (!LB.meta.stairCheck) return '';
+  let s = ''; const seen = new Set();
+  A.rooms.forEach((r, k) => {
+    const t = A.kind(k); if ((t !== 'stair' && t !== 'stairroom') || seen.has(r[0])) return;
+    seen.add(r[0]);
+    const unknown = !stairEntries(A, r, doors).length, txt = r[1] + (unknown ? ' · 입구?' : ''), fs = 1.35;
+    const [u, v] = placeText([pt((r[3] + r[4]) / 2, (r[5] + r[6]) / 2, WALL_H)], textW(txt) * fs, fs * 1.2);
+    const w = textW(txt) * fs + 1.2, h = fs * 1.6;
+    s += `<rect x="${(u - w / 2).toFixed(2)}" y="${(v - h / 2).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" rx="0.5" fill="${unknown ? '#c0392b' : '#2c2f34'}" stroke="#fff" stroke-width="0.25"/>`
+      + `<text x="${u.toFixed(2)}" y="${v.toFixed(2)}" font-size="${fs}" font-weight="800" style="fill:#fff">${esc(txt)}</text>`;
+  });
+  return `<g pointer-events="none">${s}</g>`;
+}
+
+/* 계단 입구(2026-10-20 사용자): 복도에서 계단 문(열린 계단은 오르는 쪽)으로 들어가는 파란 화살표와 갈 수 있는 층.
+   지도의 entry(N·E·S·W)가 있으면 그 변 가운데, 없으면 도면 문 목록에서 계단 변에 걸린 것 중 바깥이 복도·홀인 것 */
+const STAIR_COL = '#1f5fa8';
+function stairDest(A, r) {   // 이 계단으로 갈 수 있는 층(지도에서 같은 계단이 위·아래층에 있나)
+  const fi = FLOORS.indexOf(A.f), has = (g) => !!g && PLAN.floors[g]?.rooms.some((x) => x[0] === r[0] && x[2] === 'stair');
+  return { down: has(FLOORS[fi - 1]) ? FLOORS[fi - 1] : '', up: has(FLOORS[fi + 1]) ? FLOORS[fi + 1] : '' };
+}
+function stairEntries(A, r, doors) {   // [입구 가운데 x, y, 안쪽 방향 dx, dy] 목록
+  const [x0, x1, y0, y1] = [r[3], r[4], r[5], r[6]], ins = [];
+  const e = r[7].entry;   // 도면(school-plan.js)에 입구를 정했으면 그것이 먼저(사용자가 확인한 것), 없으면 문 목록에서
+  if (e) return [{ N: [(x0 + x1) / 2, y0, 0, 1], S: [(x0 + x1) / 2, y1, 0, -1], W: [x0, (y0 + y1) / 2, 1, 0], E: [x1, (y0 + y1) / 2, -1, 0] }[e]];
+  for (const d of doors) {
+    if (d.ax === 'h' && d.a < x1 - 0.1 && d.b > x0 + 0.1 && (Math.abs(d.at - y0) < 0.2 || Math.abs(d.at - y1) < 0.2))
+      ins.push([(Math.max(d.a, x0) + Math.min(d.b, x1)) / 2, d.at, 0, Math.abs(d.at - y0) < 0.2 ? 1 : -1]);
+    if (d.ax === 'v' && d.a < y1 - 0.1 && d.b > y0 + 0.1 && (Math.abs(d.at - x0) < 0.2 || Math.abs(d.at - x1) < 0.2))
+      ins.push([d.at, (Math.max(d.a, y0) + Math.min(d.b, y1)) / 2, Math.abs(d.at - x0) < 0.2 ? 1 : -1, 0]);
+  }
+  const open = ([x, y, dx, dy]) => { const q = A.cellAt(x - dx * 0.3, y - dy * 0.3); return q >= 0 && OPEN.has(A.kind(q)); };
+  return ins.filter(open);
+}
+function stairEntrySvg(A, doors) {
+  let s = '';
+  const seen = new Set();
+  A.rooms.forEach((r, k) => {
+    const t = A.kind(k);
+    if ((t !== 'stair' && t !== 'stairroom') || seen.has(r[0])) return;
+    seen.add(r[0]);
+    const sd = stairDest(A, r), dest = [sd.down, sd.up].filter(Boolean); if (!dest.length) return;
+    const use = stairEntries(A, r, doors);
+    for (const [ex, ey, dx, dy] of use) {
+      const nx = -dy, ny = dx, P = (back, side) => pt(ex - dx * back + nx * side, ey - dy * back + ny * side, 0.03);
+      const tail = 2.4, neck = 0.95, tip = -0.35, sw = 0.26, hw = 0.72;
+      s += poly([P(tail, -sw), P(neck, -sw), P(neck, -hw), P(tip, 0), P(neck, hw), P(neck, sw), P(tail, sw)], STAIR_COL, 'stroke="#fff" stroke-width="0.1"');
+      const txt = dest.join('·'), fs = 1.3, Q = (back, side) => pt(ex - dx * back + nx * side, ey - dy * back + ny * side, 0);
+      const [u, v] = placeText([Q(tail + 1.25, 0), Q(tail + 0.3, 2.1), Q(tail + 0.3, -2.1), Q(tail + 2.5, 0), Q(1.2, 2.6), Q(1.2, -2.6), Q(tail + 2.2, 2.4), Q(tail + 2.2, -2.4)],
+        textW(txt) * fs, fs * 1.1);
+      s += `<text class="nm" x="${u.toFixed(2)}" y="${v.toFixed(2)}" font-size="${fs}" stroke-width="0.38" style="fill:${STAIR_COL}">${txt}</text>`;
+    }
+  });
+  return s;
+}
+function roomLabel(f, r) {
+  const lb = labelOf(f, r);
+  if (lb.hide || !lb.name.trim()) return '';
+  if (lb.cat === 'stair') return '';   // 계단은 입구 화살표(stairEntrySvg)로 보인다
+  const [id, , , x0, x1, y0, y1] = r, w = x1 - x0, h = y1 - y0;
+  const [u, v] = pt((x0 + x1) / 2, (y0 + y1) / 2, 0);
+  const avail = Math.max(2.4, 2 * Math.min(w, h) * C * 0.86);
+  let lines = lb.name.split('/').map((s) => s.trim()).filter(Boolean);
+  const base = Math.min(w, h) >= 6 ? 1.85 : Math.min(w, h) >= 4 ? 1.45 : 1.15;
+  let fs = Math.min(base, avail / Math.max(...lines.map(textW)));
+  if (lines.length === 1 && fs < base * 0.8 && /[ ·]/.test(lines[0])) {   // 두 줄로 나눠 보기
+    const s = lines[0], cut = [...s.matchAll(/[ ·]/g)].map((m) => m.index).sort((p, q) => Math.abs(p - s.length / 2) - Math.abs(q - s.length / 2))[0];
+    const two = [s.slice(0, s[cut] === '·' ? cut + 1 : cut), s.slice(cut + 1)];
+    const fs2 = Math.min(base, avail / Math.max(...two.map(textW)));
+    if (fs2 > fs * 1.15) { lines = two; fs = fs2; }
+  }
+  fs = Math.max(0.8, fs);
+  const showNo = LB.meta.showNum && /^\d/.test(id);
+  const nfs = Math.max(0.7, fs * 0.6), lh = fs * 1.12, total = lines.length * lh + (showNo ? nfs * 1.05 : 0);
+  const bw = Math.max(...lines.map((l) => textW(l) * fs), showNo ? id.length * 0.58 * nfs : 0);
+  LBOX.push([u - bw / 2, v - total / 2, u + bw / 2, v + total / 2]);
+  let y = v - total / 2, s = '';
+  if (showNo) { s += `<text class="no" x="${u.toFixed(2)}" y="${(y + nfs * 0.5).toFixed(2)}" font-size="${nfs.toFixed(2)}" stroke-width="${(nfs * 0.28).toFixed(2)}">${id}</text>`; y += nfs * 1.05; }
+  const dark = lb.cat === 'void', nmStyle = dark ? ' style="fill:#fff;stroke:#34373c"' : '';
+  for (const ln of lines) { s += `<text class="nm"${nmStyle} x="${u.toFixed(2)}" y="${(y + lh / 2).toFixed(2)}" font-size="${fs.toFixed(2)}" stroke-width="${(fs * 0.26).toFixed(2)}">${esc(ln)}</text>`; y += lh; }
+  return `<g class="lbl" pointer-events="none">${s}</g>`;
+}
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- 쪽 꾸미기 ---------- */
+function renderLegend() {
+  const used = new Set();
+  for (const f of Object.keys(PLAN.floors)) for (const r of PLAN.floors[f].rooms) { const lb = labelOf(f, r); if (r[2] !== 'corridor') used.add(lb.cat); }
+  document.getElementById('legend').innerHTML = Object.entries(CATS).filter(([k]) => used.has(k) && !LEGEND_SKIP.has(k))
+    .map(([, [name, col]]) => `<span><i style="background:${col}"></i>${name}</span>`).join('');
+}
+function renderNorth() {   // 등각 방위표: 바닥의 동서남북이 그림에서 향하는 쪽 그대로
+  const R = 12, k = (x, y, m = 1) => pt(x * R * m, y * R * m).map((n) => n.toFixed(2)).join(',');
+  let s = `<ellipse rx="${(R * Math.SQRT2 * C).toFixed(2)}" ry="${(R * Math.SQRT2 * S).toFixed(2)}" fill="none" stroke="#b5b0a6" stroke-width="0.6"/>`;
+  for (const [x, y, name, dark] of [[0, -1, '북', 1], [1, 0, '동', 0], [0, 1, '남', 0], [-1, 0, '서', 0]]) {
+    const w = 0.17, tip = k(x, y, 1.08), s1 = k(-y * w, x * w), s2 = k(y * w, -x * w);
+    s += `<polygon points="0,0 ${s1} ${tip}" fill="${dark ? '#2c2f34' : '#8d9097'}"/><polygon points="0,0 ${s2} ${tip}" fill="${dark ? '#55595f' : '#b9bcc1'}"/>`;
+    const [tx, ty] = pt(x * R * 1.55, y * R * 1.55);
+    s += `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" font-size="${dark ? 5.6 : 4.8}" font-weight="800" stroke="none" fill="${dark ? '#c0392b' : '#2c2f34'}">${name}</text>`;
+  }
+  document.getElementById('north').innerHTML = s + '<circle r="1.1" fill="#fff" stroke="#2c2f34" stroke-width="0.5"/>';
+}
+function renderMeta() {
+  document.querySelectorAll('[data-meta]').forEach((e) => { if (document.activeElement !== e) e.textContent = metaVal(e.dataset.meta) || ''; });
+  document.querySelectorAll('[data-sub]').forEach((e) => { if (document.activeElement !== e) e.innerHTML = esc(subVal(e.dataset.sub) || '').replace(/ \/ /g, '<br>'); });
+}
+function renderAll() {
+  if (!VIEW) computeView();
+  const v = LB.meta.view, pair = v === '12' ? ['1F', '2F'] : v === '34' ? ['3F', '4F'] : null, one = /^[1-4]F$/.test(v);
+  document.querySelector('.floors').classList.toggle('one', one);
+  document.querySelector('.floors').classList.toggle('two', !!pair);
+  for (const s of document.querySelectorAll('.fl')) {
+    const show = pair ? pair.includes(s.dataset.floor) : !one || s.dataset.floor === v;
+    s.classList.toggle('show', show);
+    s.querySelector('.fl-svg').innerHTML = show ? renderFloor(s.dataset.floor) : '';
+  }
+  renderLegend(); renderMeta(); renderNorth(); applyPaper(); syncButtons();
+}
+const renderSoon = (() => { let q = 0; return () => { if (!q) q = requestAnimationFrame(() => { q = 0; renderAll(); }); }; })();
+
+function applyPaper() {
+  const a4 = LB.meta.paper === 'A4';
+  const tall = LB.meta.view === '12' || LB.meta.view === '34';   // 두 층씩은 세로로 인쇄
+  document.getElementById('pagesize').textContent = `@page { size: ${a4 ? 'A4' : 'A3'} ${tall ? 'portrait' : 'landscape'}; margin: 0 }`;
+  document.getElementById('sheet').classList.toggle('a4', a4);
+  document.getElementById('sheet').classList.toggle('tall', tall);
+  fitScreen();
+}
+function fitScreen() {   // 화면에서는 창 너비에 맞춰 줄여 보인다(인쇄는 원래 크기)
+  document.documentElement.style.setProperty('--toolsH', document.querySelector('.tools').offsetHeight + 'px');
+  const sh = document.getElementById('sheet'), panel = document.getElementById('panel');
+  sh.style.zoom = '';
+  const room = window.innerWidth - 78 - (panel.hidden ? 0 : panel.offsetWidth + 14);
+  const z = Math.min(1, room / sh.offsetWidth) * ZOOM;
+  if (Math.abs(z - 1) > 0.001) sh.style.zoom = z.toFixed(3);
+}
+/* 화면 배율(100% = 창에 맞춤). 바꿀 때 보던 가운데가 그대로 있게 스크롤을 맞춘다 */
+let ZOOM = 1;
+function setZoom(pct) {
+  pct = Math.max(50, Math.min(400, Math.round(pct / 10) * 10));
+  const sh = document.getElementById('sheet'), old = sh.getBoundingClientRect();
+  const cx = (innerWidth / 2 - old.left) / old.width, cy = (innerHeight / 2 - old.top) / old.height;   // 화면 가운데가 종이의 어디였나
+  ZOOM = pct / 100; fitScreen();
+  const now = sh.getBoundingClientRect();
+  scrollBy(now.left + cx * now.width - innerWidth / 2, now.top + cy * now.height - innerHeight / 2);
+  document.getElementById('zRange').value = pct; document.getElementById('zVal').textContent = pct + '%';
+}
+document.getElementById('zRange').addEventListener('input', (e) => setZoom(+e.target.value));
+document.getElementById('zIn').onclick = () => setZoom(ZOOM * 100 + 20);
+document.getElementById('zOut').onclick = () => setZoom(ZOOM * 100 - 20);
+document.getElementById('zVal').onclick = () => setZoom(100);
+window.addEventListener('wheel', (e) => { if (!e.ctrlKey) return; e.preventDefault(); setZoom(ZOOM * 100 + (e.deltaY < 0 ? 10 : -10)); }, { passive: false });
+
+/* ---------- 라벨 편집 ---------- */
+const markChanged = () => document.body.classList.add('changed');
+function setRoom(f, id, patch) {   // 기본 세트면 공간 DB 이름 위에, 다른 세트면 기본 위에 바뀐 것만 적는다
+  const r = PLAN.floors[f].rooms.find((x) => x[0] === id), set = activeSet();
+  const under = set ? baseLabel(f, r) : Object.assign(defaultLabel(r), isEntrance(f, id) ? { hide: true } : {}), store = set ? (set.rooms = set.rooms || {}) : LB.rooms;
+  const cur = Object.assign({}, under, store[f]?.[id] || {}, patch);
+  store[f] = store[f] || {};
+  const diff = Object.fromEntries(Object.entries(cur).filter(([k, v]) => v !== under[k]));
+  if (Object.keys(diff).length) store[f][id] = diff; else delete store[f][id];
+  markChanged(); renderSoon();
+}
+function resetRoom(f, id) {
+  const store = activeSet() ? activeSet().rooms : LB.rooms;
+  if (store?.[f]) delete store[f][id];
+  markChanged(); renderSoon(); buildPanel();
+}
+function buildPanel() {
+  const p = document.getElementById('panel');
+  const opts = Object.entries(CATS).map(([k, [n]]) => `<option value="${k}">${n}</option>`).join('');
+  let h = `<h3>라벨 편집 · ${esc(LB.active || '기본')}</h3>${activeSet() ? `<div class="setinfo">지금 <b>'${esc(LB.active)}'</b> 세트를 고치는 중입니다. 여기서 바꾼 방(노란 칸)만 이 세트에 저장되고, 나머지는 기본 이름을 따라갑니다. 제목·연도·층 설명도 이 세트에만 따로 적을 수 있습니다.</div>` : ''}<p class="hint">기본 이름은 <b>공간 DB</b>(관리자 공간 표)에서 불러옵니다. 바꾼 칸은 노랗게 보이고, ↺로 원래대로 돌립니다. 도면에서 방을 누르면 그 줄로 갑니다. 이름에 <b>/</b>를 넣으면 줄이 바뀝니다. 위쪽 제목·층 설명·아래 글은 글자를 직접 눌러 고칩니다(층 설명의 줄바꿈은 " / "). 다 고치면 <b>💾 HTML 저장</b>.</p>`;
+  h += `<details open><summary>지도 둘레(주변)</summary><table>${Object.entries(AROUND_DIR).map(([k, [d]]) =>
+    `<tr><td class="no">${d}쪽</td><td><input type="text" data-around="${k}" value="${esc(LB.meta.around[k] || '')}"></td></tr>`).join('')}</table></details>`;
+  const own = activeSet() ? activeSet().rooms || {} : LB.rooms;
+  for (const f of ['1F', '2F', '3F', '4F']) {
+    const seen = new Set(), rows = [];
+    for (const r of PLAN.floors[f].rooms) {
+      if (seen.has(r[0]) || r[2] === 'corridor' || (r[2] === 'void' && r[1] === '오픈')) continue;
+      seen.add(r[0]);
+      rows.push(r);
+    }
+    rows.sort((a, b) => (/^\d/.test(b[0]) - /^\d/.test(a[0])) || a[0].localeCompare(b[0], 'ko', { numeric: true }));
+    h += `<details open><summary>${f} (${rows.length}곳)</summary><table>${rows.map((r) => {
+      const lb = labelOf(f, r);
+      return `<tr data-k="${f}|${esc(r[0])}" class="${lb.hide ? 'hid' : ''} ${own[f]?.[r[0]] ? 'own' : ''}"><td class="no">${/^\d/.test(r[0]) ? esc(r[0]) : '<span class="gen">—</span>'}</td>
+        <td><input type="text" value="${esc(lb.name)}"></td><td><select>${opts}</select></td>
+        <td><label title="도면에서 이름 숨기기"><input type="checkbox" ${lb.hide ? 'checked' : ''}>숨김</label></td><td><button class="undo" title="원래대로">↺</button></td></tr>`;
+    }).join('')}</table></details>`;
+  }
+  p.innerHTML = h;
+  p.querySelectorAll('input[data-around]').forEach((e) => e.addEventListener('input', () => { LB.meta.around[e.dataset.around] = e.value; markChanged(); renderSoon(); }));
+  p.querySelectorAll('tr[data-k]').forEach((tr) => {
+    const [f, id] = tr.dataset.k.split('|'), r = PLAN.floors[f].rooms.find((x) => x[0] === id);
+    tr.querySelector('select').value = labelOf(f, r).cat;
+    const mark = () => tr.classList.add('own');
+    tr.querySelector('.undo').addEventListener('click', () => resetRoom(f, id));
+    tr.querySelector('input[type=text]').addEventListener('input', (e) => { mark(); setRoom(f, id, { name: e.target.value }); });
+    tr.querySelector('select').addEventListener('change', (e) => { mark(); setRoom(f, id, { cat: e.target.value }); });
+    tr.querySelector('input[type=checkbox]').addEventListener('change', (e) => { mark(); tr.classList.toggle('hid', e.target.checked); setRoom(f, id, { hide: e.target.checked }); });
+  });
+}
+function setEditing(on) {
+  document.body.classList.toggle('editing', on);
+  const p = document.getElementById('panel');
+  p.hidden = !on;
+  if (on) buildPanel();
+  document.querySelectorAll('[data-meta],[data-sub]').forEach((e) => { e.contentEditable = on ? 'plaintext-only' : 'false'; if (!on) e.removeAttribute('contenteditable'); });
+  syncButtons(); fitScreen();
+}
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  const set = activeSet();   // 세트를 고른 동안 고친 제목·설명은 그 세트에만
+  if (t.dataset?.meta) { const v = t.textContent.trim(); if (set) (set.meta = set.meta || {})[t.dataset.meta] = v; else LB.meta[t.dataset.meta] = v; markChanged(); }
+  else if (t.dataset?.sub) {
+    const v = t.innerText.trim().split(/\n+/).join(' / ');
+    if (set) { set.meta = set.meta || {}; (set.meta.subs = set.meta.subs || {})[t.dataset.sub] = v; } else LB.meta.subs[t.dataset.sub] = v;
+    markChanged();
+  }
+});
+document.addEventListener('focusout', (e) => { if (e.target.dataset?.meta || e.target.dataset?.sub) renderMeta(); });
+document.getElementById('sheet').addEventListener('click', (e) => {
+  if (!document.body.classList.contains('editing')) return;
+  const room = e.target.closest('.room'); if (!room) return;
+  const tr = document.querySelector(`#panel tr[data-k="${CSS.escape(room.dataset.k)}"]`); if (!tr) return;
+  tr.closest('details').open = true;
+  tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  tr.classList.add('flash'); setTimeout(() => tr.classList.remove('flash'), 1400);
+  tr.querySelector('input[type=text]').focus({ preventScroll: true });
+});
+document.getElementById('panel').addEventListener('focusin', (e) => {   // 목록 줄을 고르면 도면의 그 방이 깜빡인다
+  const tr = e.target.closest('tr[data-k]'); if (!tr) return;
+  document.querySelectorAll(`.room[data-k="${CSS.escape(tr.dataset.k)}"]`).forEach((r) => { r.classList.remove('hit'); void r.getBBox(); r.classList.add('hit'); });
+});
+
+/* ---------- 찾기(2026-10-20 사용자): 방은 누구나, 사람(근무 위치)은 로그인한 선생님만 ----------
+   로그인은 이 브라우저에 남은 학년 마을(village-auth)이나 studentshub(studentshub_login_session_v1) 세션 토큰으로 확인한다 */
+let HL = null, WORK = null;   // HL: { f, id, title, sub } 강조할 방 · WORK: village_work_rooms 결과
+function storedToken() {
+  const ok = (t) => typeof t === 'string' && /^shs_[0-9a-f]{64}$/.test(t);
+  try { const a = JSON.parse(localStorage.getItem('village-auth') || 'null'); if (ok(a?.token)) return a.token; } catch (e) {}
+  try { const b = JSON.parse(localStorage.getItem('studentshub_login_session_v1') || 'null'); if (ok(b?.pin)) return b.pin; } catch (e) {}
+  return '';
+}
+async function loadWork() {
+  const token = storedToken(); if (!SERVER || !token) return;
+  try {
+    const res = await fetch(SERVER.url + '/rest/v1/rpc/village_work_rooms', { method: 'POST',
+      headers: { apikey: SERVER.key, Authorization: 'Bearer ' + SERVER.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_token: token }) });
+    const d = res.ok ? await res.json() : null;
+    if (d && d.ok) { WORK = d; buildFind(); }
+  } catch (e) {}
+}
+const floorOfRoom = (id) => FLOORS.find((f) => PLAN.floors[f].rooms.some((r) => r[0] === id)) || '';
+let FIND = new Map();   // 목록 글 → { f, id, title, sub }
+function buildFind() {
+  FIND = new Map();
+  if (WORK) for (const p of WORK.people || []) {
+    const f = p.room ? floorOfRoom(p.room) : '';
+    FIND.set(`${p.name} 선생님${p.subject ? ' (' + p.subject + ')' : ''}`, f ? { f, id: p.room, title: `${p.name} 선생님`, sub: '' } : { none: p.name });
+  }
+  for (const f of FLOORS) for (const r of PLAN.floors[f].rooms) {
+    const lb = labelOf(f, r); if (!/^\d/.test(r[0]) || !lb.name.trim()) continue;
+    FIND.set(`${r[0]} ${lb.name.replace(/\//g, ' ')} (${f})`, { f, id: r[0], title: lb.name.replace(/\//g, ' '), sub: '' });
+  }
+  document.getElementById('findList').innerHTML = [...FIND.keys()].map((k) => `<option value="${esc(k)}"></option>`).join('');
+  document.getElementById('bFind').placeholder = WORK ? '🔍 사람·방 찾기' : '🔍 방 찾기';
+}
+function findGo(text) {
+  const hit = FIND.get(text.trim()); if (!hit) return;
+  if (hit.none) { toast(`${hit.none} 선생님은 근무 위치가 아직 없어요. studentshub '내 정보'에서 정할 수 있어요.`); return; }
+  const people = (WORK?.people || []).filter((p) => p.room === hit.id).map((p) => p.name);
+  HL = { ...hit, sub: hit.title.endsWith('선생님') ? (labelOf(hit.f, PLAN.floors[hit.f].rooms.find((r) => r[0] === hit.id)).name.replace(/\//g, ' ')) : people.slice(0, 4).join(' · ') + (people.length > 4 ? ` 외 ${people.length - 4}명` : '') };
+  LB.meta.view = hit.f; document.getElementById('bFindX').hidden = false; renderAll();
+}
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3500); }
+/* 강조: 방 바닥을 빨갛게 깜빡이고, 위에 말풍선(이름·방) */
+function highlightSvg(A) {
+  if (!HL || HL.f !== A.f) return '';
+  const rs = A.rooms.filter((r) => r[0] === HL.id); if (!rs.length) return '';
+  let s = rs.map((r) => poly(quadFloor(r[3], r[4], r[5], r[6], 0.05), 'rgba(231,76,60,.28)', 'class="hl" stroke="#e03a2a" stroke-width="0.4"')).join('');
+  const r = rs.reduce((p, q) => ((q[4] - q[3]) * (q[6] - q[5]) > (p[4] - p[3]) * (p[6] - p[5]) ? q : p));
+  const [u, v] = pt((r[3] + r[4]) / 2, (r[5] + r[6]) / 2, 0), top = v - 6.5, fs = 1.9, fs2 = 1.3;
+  const w = Math.max(textW(HL.title) * fs, HL.sub ? textW(HL.sub) * fs2 : 0) + 2.4, h = HL.sub ? 5.2 : 3.4;
+  s += `<path d="M${u.toFixed(2)},${(v - 0.6).toFixed(2)} l-1,-${(6.5 - h / 2 - 0.6).toFixed(2)} h2 z" fill="#e03a2a"/>`;
+  s += `<rect x="${(u - w / 2).toFixed(2)}" y="${(top - h / 2).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" rx="1" fill="#e03a2a" stroke="#fff" stroke-width="0.3"/>`;
+  s += `<text x="${u.toFixed(2)}" y="${(top - (HL.sub ? 0.85 : 0)).toFixed(2)}" font-size="${fs}" font-weight="800" style="fill:#fff">${esc(HL.title)}</text>`;
+  if (HL.sub) s += `<text x="${u.toFixed(2)}" y="${(top + 1.35).toFixed(2)}" font-size="${fs2}" font-weight="600" style="fill:#ffe9e6">${esc(HL.sub)}</text>`;
+  return `<g pointer-events="none">${s}</g>`;
+}
+document.getElementById('bFind').addEventListener('change', (e) => findGo(e.target.value));
+document.getElementById('bFind').addEventListener('keydown', (e) => { if (e.key === 'Enter') findGo(e.target.value); });
+document.getElementById('bFindX').onclick = () => { HL = null; document.getElementById('bFind').value = ''; document.getElementById('bFindX').hidden = true; renderAll(); };
+
+/* ---------- 주변(2026-10-20 사용자): 위성사진을 참고한 대략의 배치. 건물 크기·그림 범위는 그대로, 남는 여백 안에서만 옅은 선으로(음영 없음) ----------
+   좌표는 실측이 아니라 '어느 쪽에 무엇이 있나'를 보이는 정도. 북 한누리대로 · 서 괴화산(숲) · 동 농구장·운동장·시청대로 · 남 주차장 */
+const CTX_LINE = '#cdc8bd', CTX_TEXT = '#a8a397';
+/* 나무: 줄기 선 + 둥근 잎(흰 바탕에 옅은 테두리, 음영 없음) */
+function treeSvg(x, y, z, sz = 1) {
+  const [u, v] = pt(x, y, z), h = 2.4 * sz, r = 1.35 * sz;
+  return `<line x1="${u.toFixed(2)}" y1="${v.toFixed(2)}" x2="${u.toFixed(2)}" y2="${(v - h + r * 0.4).toFixed(2)}" stroke="${CTX_LINE}" stroke-width="0.2"/>`
+    + `<circle cx="${u.toFixed(2)}" cy="${(v - h).toFixed(2)}" r="${r.toFixed(2)}" fill="#fff" stroke="${CTX_LINE}" stroke-width="0.16"/>`;
+}
+/* 장난감 같은 자동차: 몸통 상자 + 지붕 상자(흰 면, 옅은 테두리). (x,y) 가운데, dir 'E'|'W'|'N'|'S' 앞쪽 */
+function carSvg(x, y, z, dir) {
+  const along = dir === 'E' || dir === 'W', L = 4.0, W = 1.8, sg = dir === 'E' || dir === 'S' ? 1 : -1;
+  const bx = (l0, l1, w0, w1, z0, z1) => {
+    const [x0, x1, y0, y1] = along ? [x + sg * l0, x + sg * l1, y + w0, y + w1] : [x + w0, x + w1, y + sg * l0, y + sg * l1];
+    const X0 = Math.min(x0, x1), X1 = Math.max(x0, x1), Y0 = Math.min(y0, y1), Y1 = Math.max(y0, y1);
+    const f = (a, b2) => `<polygon points="${ps([pt(...a, z0), pt(...b2, z0), pt(...b2, z1), pt(...a, z1)])}" fill="#fff" stroke="${CTX_LINE}" stroke-width="0.1"/>`;
+    let o = '';
+    if (faceSeen(0, 1)) o += f([X0, Y1], [X1, Y1]); if (faceSeen(0, -1)) o += f([X0, Y0], [X1, Y0]);
+    if (faceSeen(1, 0)) o += f([X1, Y0], [X1, Y1]); if (faceSeen(-1, 0)) o += f([X0, Y0], [X0, Y1]);
+    return o + `<polygon points="${ps(quadFloor(X0, X1, Y0, Y1, z1))}" fill="#fff" stroke="${CTX_LINE}" stroke-width="0.1"/>`;
+  };
+  return bx(-L / 2, L / 2, -W / 2, W / 2, z, z + 0.65) + bx(-L * 0.3, L * 0.18, -W * 0.42, W * 0.42, z + 0.65, z + 1.15);
+}
+function contextSvg(f, vb) {
+  if (!LB.meta.context) return '';
+  const z = -SLAB, P = (x, y) => pt(x, y, z), line = (pts, extra = '') => `<polyline points="${ps(pts.map(([x, y]) => P(x, y)))}" fill="none" stroke="${CTX_LINE}" stroke-width="0.16" ${extra}/>`;
+  const rect = (x0, x1, y0, y1, extra = '') => `<polygon points="${ps(quadFloor(x0, x1, y0, y1, z))}" fill="none" stroke="${CTX_LINE}" stroke-width="0.16" ${extra}/>`;
+  const label = (x, y, t, fs = 1.9) => { const [u, v] = P(x, y); return `<text x="${u.toFixed(2)}" y="${v.toFixed(2)}" font-size="${fs}" font-weight="700" stroke="#fff" stroke-width="0.4" style="fill:${CTX_TEXT}">${t}</text>`; };
+  let g = '';
+  // 북: 한누리대로(건물 북쪽 녹지 너머 동서 도로)
+  g += line([[-80, -14], [220, -14]]) + line([[-80, -30], [220, -30]]) + line([[-80, -22], [220, -22]], 'stroke-dasharray="1.2 1"');
+  // 동: 시청대로(남북 도로)
+  g += line([[132, -14], [132, 220]]) + line([[148, -30], [148, 220]]) + line([[140, -22], [140, 220]], 'stroke-dasharray="1.2 1"');
+  // 서: 괴화산(숲) — 건물 서쪽 가장자리를 따라 경계, 안에 옅은 나무
+  g += line([[-4, -10], [-6, 30], [-4, 60], [-8, 104], [-4, 140]], 'stroke-dasharray="0.6 0.5"');
+  const trees = [];
+  for (let y = -10; y < 140; y += 4.6) for (let i = 0, x = -9 - ((Math.round(y / 4.6) % 2 + 2) % 2) * 2.3; x > -80; x -= 4.6, i++) {
+    const jx = Math.sin(x * 12.9 + y * 7.1) * 1.1, jy = Math.cos(x * 4.3 + y * 9.7) * 1.1, sz = 1 + 0.25 * Math.sin(x * 3.1 + y * 1.7);
+    trees.push([x + jx, y + jy, sz]);
+  }
+  trees.sort((p, q) => depthOf(p[0], p[1]) - depthOf(q[0], q[1]));
+  for (const [x, y, sz] of trees) g += treeSvg(x, y, z, sz);
+  // 위치는 위성사진에서 북쪽 날개 폭(87m)으로 비율을 잰 대략값(2026-10-20)
+  // 동: 농구장(북동) · 운동장(동, 트랙)
+  g += rect(92, 113, -3, 29) + line([[92, 13], [113, 13]]);
+  { const [u, v] = P(102.5, 13); g += `<ellipse cx="${u.toFixed(2)}" cy="${v.toFixed(2)}" rx="2.4" ry="1.4" fill="none" stroke="${CTX_LINE}" stroke-width="0.14"/>`; }
+  g += rect(80, 119, 43, 100) + rect(85, 114, 50, 93, 'stroke-dasharray="1 0.8"');
+  // 남: 주차장(주차 칸 줄)
+  g += rect(18, 84, 102, 119);
+  for (let x = 21; x < 82; x += 2.6) g += line([[x, 102], [x, 107]]) + line([[x, 114], [x, 119]]);
+  // 자동차(2026-10-20 사용자): 주차장 몇 대, 한누리대로·시청대로는 우측 통행으로 달리는 차 몇 대
+  const cars = [];
+  for (const [i, row] of [[1, 'N'], [3, 'N'], [4, 'N'], [7, 'N'], [10, 'N'], [12, 'N'], [13, 'N'], [17, 'N'], [21, 'N']].map(([k, d]) => [k, d])) cars.push([21 + 2.6 * i + 1.3, 104.5, 'N']);
+  for (const i of [2, 5, 6, 9, 14, 15, 19, 22]) cars.push([21 + 2.6 * i + 1.3, 116.5, 'S']);
+  for (const [x, d, y] of [[-20, 'W', -27.5], [38, 'W', -25], [104, 'W', -27.5], [8, 'E', -16.5], [66, 'E', -19], [178, 'E', -16.5]]) cars.push([x, y, d]);   // 한누리대로: 남쪽 차로 동쪽으로, 북쪽 차로 서쪽으로
+  for (const [y, d, x] of [[20, 'S', 135.5], [96, 'S', 137.5], [60, 'N', 144.5], [150, 'N', 142.5]]) cars.push([x, y, d]);   // 시청대로: 서쪽 차로 남쪽으로, 동쪽 차로 북쪽으로
+  cars.sort((p, q) => depthOf(p[0], p[1]) - depthOf(q[0], q[1]));
+  for (const [x, y, d] of cars) g += carSvg(x, y, z, d);
+  // 정문(농구장과 운동장 사이)·후문(운동장 남쪽, 주차장 쪽): 학교에서 시청대로로 나가는 길(사용자가 위성사진에 표시)
+  const gate = (y0, y1, x0, t) => { g += line([[x0, y0], [132, y0]]) + line([[x0, y1], [132, y1]]); const [u, v] = P(127, (y0 + y1) / 2);
+    g += `<rect x="${(u - 0.9).toFixed(2)}" y="${(v - 0.9).toFixed(2)}" width="1.8" height="1.8" fill="none" stroke="#8f8a7e" stroke-width="0.22"/>` + label(127, (y0 + y1) / 2 - 4.5, t, 2.2).replace(CTX_TEXT, '#7d786d'); };
+  gate(32, 40, 100, '정문'); gate(102, 108, 84, '후문');
+  g += label(102.5, 4, '농구장') + label(99.5, 71, '운동장', 2.3) + label(51, 110.5, '주차장', 2.2);
+  return `<g class="ctx" pointer-events="none">${g}</g>`;   // 칸(svg) 밖은 저절로 잘린다. 건물 범위(viewBox)는 그대로라 건물은 줄지 않는다
+}
+
+/* ---------- 보는 방향·현재 위치(2026-10-20 사용자) ----------
+   📍 내 위치 찍기: 지도에서 서 있는 곳을 누른 채 바라보는 쪽으로 끌어 놓으면, 그 방향이 그림 위쪽이 되게 돌리고 '현재 위치'를 찍는다 */
+function hereSvg(A) {
+  const h = LB.meta.here; if (!h || h.f !== A.f) return '';
+  const fx = Math.cos(h.a), fy = Math.sin(h.a), nx = -fy, ny = fx, P = (a, b) => pt(h.x + fx * a + nx * b, h.y + fy * a + ny * b, 0.06);
+  let s = poly([P(0, 0), P(4.2, -2.2), P(4.2, 2.2)], 'rgba(224,58,42,.22)');   // 바라보는 쪽 부채꼴
+  s += poly([P(3.2, -0.55), P(4.6, 0), P(3.2, 0.55)], '#e03a2a');
+  const [u, v] = pt(h.x, h.y, 0.06);
+  s += `<circle cx="${u.toFixed(2)}" cy="${v.toFixed(2)}" r="0.95" fill="#e03a2a" stroke="#fff" stroke-width="0.35"/>`;
+  const [tu, tv] = placeText([[u, v - 2.4], [u, v + 2.4], [u + 5, v], [u - 5, v]], textW('현재 위치') * 1.6, 1.8);
+  s += `<text class="nm" x="${tu.toFixed(2)}" y="${tv.toFixed(2)}" font-size="1.6" stroke-width="0.45" style="fill:#e03a2a">현재 위치</text>`;
+  return `<g pointer-events="none">${s}</g>`;
+}
+let picking = false, pickStart = null;
+function startPick() {
+  picking = true; document.body.classList.add('picking');
+  toast('지도에서 서 있는 곳을 누른 채, 바라보는 쪽으로 끌어서 놓으세요. (그냥 누르면 지금 방향 그대로)');
+}
+const svgPoint = (svg, e) => { const q = svg.createSVGPoint(); q.x = e.clientX; q.y = e.clientY; return q.matrixTransform(svg.getScreenCTM().inverse()); };
+document.getElementById('sheet').addEventListener('pointerdown', (e) => {
+  if (!picking) return;
+  const svg = e.target.closest('.fl-svg svg'); if (!svg) return;
+  e.preventDefault();
+  const q = svgPoint(svg, e);
+  pickStart = { f: svg.closest('.fl').dataset.floor, svg, p: unPt(q.x, q.y) };
+});
+window.addEventListener('pointerup', (e) => {
+  if (!picking || !pickStart) return;
+  const q = svgPoint(pickStart.svg, e), end = unPt(q.x, q.y), [x, y] = pickStart.p;
+  let a = Math.atan2(end[1] - y, end[0] - x);
+  if (Math.hypot(end[0] - x, end[1] - y) < 1.5) a = Math.atan2(-1, 0);   // 끌지 않았으면 북쪽을 보고 선 것으로
+  a = Math.round(a / (Math.PI / 2)) * (Math.PI / 2);   // 동서남북 중 가까운 쪽으로(90도 단위, 2026-10-20 사용자)
+  LB.meta.here = { f: pickStart.f, x: +x.toFixed(2), y: +y.toFixed(2), a: +a.toFixed(4) };
+  LB.meta.turn = 0; if (LB.meta.view === 'all') LB.meta.view = pickStart.f;
+  picking = false; pickStart = null; document.body.classList.remove('picking');
+  markChanged(); setFacing(); renderAll();
+});
+const turn = (d) => { LB.meta.turn = ((LB.meta.turn + d) % 4 + 4) % 4; markChanged(); setFacing(); renderAll(); };
+document.getElementById('bRotL').onclick = () => turn(-1);
+document.getElementById('bRotR').onclick = () => turn(1);
+document.getElementById('bHere').onclick = () => startPick();
+document.getElementById('bHereX').onclick = () => { delete LB.meta.here; LB.meta.turn = 0; markChanged(); setFacing(); renderAll(); };
+
+/* ---------- 도구 단추 ---------- */
+function syncButtons() {
+  document.getElementById('bEdit').classList.toggle('on', document.body.classList.contains('editing'));
+  document.getElementById('bNum').classList.toggle('on', !!LB.meta.showNum);
+  document.getElementById('bFurn').classList.toggle('on', !!LB.meta.furniture);
+  document.getElementById('bStair').classList.toggle('on', !!LB.meta.stairCheck);
+  document.getElementById('bCtx').classList.toggle('on', !!LB.meta.context);
+  document.getElementById('bPaper').value = LB.meta.paper;
+  document.getElementById('bHereX').hidden = !LB.meta.here;
+  document.querySelectorAll('#bView button').forEach((b) => b.classList.toggle('on', b.dataset.v === LB.meta.view));
+  const sel = document.getElementById('bSet');
+  sel.innerHTML = [['', '기본(공간 DB)'], ...LB.sets.map((x) => [x.name, x.name])].map(([v, n]) => `<option value="${esc(v)}">${esc(n)}</option>`).join('');
+  sel.value = LB.active;
+  document.getElementById('bSetMenu').disabled = !LB.active;
+}
+document.getElementById('bEdit').onclick = () => setEditing(!document.body.classList.contains('editing'));
+document.getElementById('bNum').onclick = () => { LB.meta.showNum = !LB.meta.showNum; markChanged(); renderAll(); };
+document.getElementById('bCtx').onclick = () => { LB.meta.context = !LB.meta.context; markChanged(); renderAll(); };
+document.getElementById('bStair').onclick = () => { LB.meta.stairCheck = !LB.meta.stairCheck; markChanged(); renderAll(); };
+document.getElementById('bFurn').onclick = () => { LB.meta.furniture = !LB.meta.furniture; markChanged(); renderAll(); };
+document.getElementById('bPaper').onchange = (e) => { LB.meta.paper = e.target.value; markChanged(); renderAll(); };
+document.getElementById('bView').onclick = (e) => { const v = e.target.dataset?.v; if (v && v !== LB.meta.view) { LB.meta.view = v; renderAll(); } };
+/* 라벨 세트 고르기·만들기·이름 바꾸기·지우기 */
+const switchSet = (name) => { LB.active = name; renderAll(); if (document.body.classList.contains('editing')) buildPanel(); };
+document.getElementById('bSet').onchange = (e) => switchSet(e.target.value);
+document.getElementById('bSetNew').onclick = () => {
+  const name = (prompt('새 라벨 세트 이름 (예: 수능 시험장, 캠공 강의실)\n지금 보이는 라벨에서 시작하고, 이 세트에서 고친 방만 따로 저장됩니다.') || '').trim();
+  if (!name) return;
+  if (LB.sets.some((x) => x.name === name)) return alert('같은 이름의 세트가 이미 있어요.');
+  const cur = activeSet();
+  LB.sets.push({ name, rooms: JSON.parse(JSON.stringify(cur?.rooms || {})), meta: JSON.parse(JSON.stringify(cur?.meta || {})) });
+  markChanged(); switchSet(name);
+  if (!document.body.classList.contains('editing')) setEditing(true);
+};
+document.getElementById('bSetMenu').onclick = () => {
+  const cur = activeSet(); if (!cur) return;
+  const v = prompt(`'${cur.name}' 세트\n새 이름을 적으면 이름이 바뀌고, 「지우기」라고 적으면 세트를 지웁니다.`, cur.name);
+  if (v === null) return;
+  if (v.trim() === '지우기') { if (confirm(`'${cur.name}' 세트를 지울까요?`)) { LB.sets = LB.sets.filter((x) => x !== cur); markChanged(); switchSet(''); } return; }
+  const name = v.trim(); if (!name || name === cur.name) return;
+  if (LB.sets.some((x) => x.name === name)) return alert('같은 이름의 세트가 이미 있어요.');
+  cur.name = name; LB.active = name; markChanged(); renderAll();
+};
+document.getElementById('bPrint').onclick = () => window.print();
+/* PDF 저장: 브라우저 인쇄 창의 'PDF로 저장'을 쓴다(벡터라 확대해도 선명, 글자 선택·주석 가능). 파일 이름은 문서 제목을 따른다 */
+document.getElementById('bPdf').onclick = () => {
+  const clean = (x) => (x || '').replace(/[\/:*?"<>|]/g, '').trim();
+  const name = `${clean(metaVal('title')) || '배치도'} (${clean(metaVal('date'))})${LB.meta.view === '12' ? ' 1·2F' : LB.meta.view === '34' ? ' 3·4F' : LB.meta.view !== 'all' ? ' ' + LB.meta.view : ''}${LB.active ? ' - ' + clean(LB.active) : ''}`;
+  const t = document.getElementById('toast'), old = document.title;
+  t.innerHTML = `인쇄 창에서 <b>대상(프린터)</b>을 <b>「PDF로 저장」</b>(또는 Microsoft Print to PDF)으로 고르고 <b>저장</b>을 누르세요.<br>용지: ${LB.meta.paper} ${LB.meta.view === "12" || LB.meta.view === "34" ? "세로" : "가로"} · 파일 이름: ${esc(name)}.pdf`;
+  t.hidden = false;
+  document.title = name;
+  const done = () => { document.title = old; window.removeEventListener('afterprint', done); setTimeout(() => { t.hidden = true; }, 2500); };
+  window.addEventListener('afterprint', done);
+  setTimeout(() => window.print(), 400);
+};
+document.getElementById('bSave').onclick = () => {
+  const doc = document.documentElement.cloneNode(true);
+  doc.querySelectorAll('.fl-svg, #legend, #north, #panel').forEach((e) => { e.innerHTML = ''; });
+  doc.querySelector('#panel').hidden = true;
+  doc.querySelector('#sheet').removeAttribute('style');
+  doc.querySelectorAll('[contenteditable]').forEach((e) => e.removeAttribute('contenteditable'));
+  doc.querySelector('body').className = '';
+  doc.querySelector('#labels').textContent = JSON.stringify(LB, null, 1).replace(/</g, '\\u003c');
+  const html = '<!doctype html>\n' + doc.outerHTML;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  const clean = (x) => (x || '').replace(/[\\/:*?"<>|]/g, '');
+  a.download = `${clean(metaVal('title')) || '배치도'} (${clean(metaVal('date'))}).html`;
+  document.body.appendChild(a); a.click(); a.remove();
+  document.body.classList.remove('changed');
+};
+window.addEventListener('beforeunload', (e) => { if (document.body.classList.contains('changed')) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('resize', fitScreen);
+window.addEventListener('beforeprint', () => { document.getElementById('sheet').style.zoom = ''; });
+window.addEventListener('afterprint', fitScreen);
+
+applyDb();
+setFacing();
+renderAll();
+buildFind();
+loadDb().then(buildFind);
+loadWork();
+})();
+</script>
+
+
+</body></html>
